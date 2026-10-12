@@ -14,7 +14,9 @@
   h1 span{color:var(--accent);}
   #stage{position:relative;width:100%;aspect-ratio:360/560;border-radius:12px;overflow:hidden;border:1px solid var(--line);box-shadow:0 4px 30px rgba(0,0,0,.5), 0 0 40px rgba(106,212,255,.06);}
   canvas{display:block;width:100%;height:100%;touch-action:none;}
-  #exitBtn{display:none;position:absolute;top:6px;right:6px;width:26px;height:26px;border-radius:50%;background:rgba(255,255,255,.08);color:var(--ink);border:none;font-size:12px;align-items:center;justify-content:center;cursor:pointer;z-index:5;}
+  #exitBtn,#pauseBtn{display:none;position:absolute;top:6px;width:26px;height:26px;border-radius:50%;background:rgba(255,255,255,.08);color:var(--ink);border:none;font-size:11px;align-items:center;justify-content:center;cursor:pointer;z-index:5;}
+  #pauseBtn{right:36px;}
+  #exitBtn{right:6px;}
   #overlay{position:absolute;inset:0;background:rgba(8,8,12,.93);display:flex;flex-direction:column;align-items:center;justify-content:flex-start;overflow-y:auto;color:var(--ink);text-align:center;padding:14px 12px;z-index:4;}
   #overlay h2{margin:0;color:var(--ink);font-weight:600;}
   #overlay p{margin:0;font-size:13.5px;color:var(--dim);max-width:300px;line-height:1.55;}
@@ -45,6 +47,7 @@
   <h1>LANZADOR DE <span>CAVERNAS</span> 2</h1>
   <div id="stage">
     <canvas id="c" width="360" height="560"></canvas>
+    <button id="pauseBtn" title="Pausa (P)">❚❚</button>
     <button id="exitBtn" title="Menú">✕</button>
     <div id="overlay"></div>
   </div>
@@ -59,6 +62,7 @@
   ctx.setTransform(DPR,0,0,DPR,0,0);
   const overlayEl = document.getElementById('overlay');
   const exitBtn = document.getElementById('exitBtn');
+  const pauseBtn = document.getElementById('pauseBtn');
 
   // ======== 8 ELEMENTOS (nuevos: PLANTA y SOMBRA) ========
   const ELEMENT_INFO = {
@@ -130,8 +134,8 @@
     return {
       mejorOla:0, mejorPuntaje:0, gemas:0, nivel:1, estrellas:{}, tiene:t,
       cofres:{madera:1,hierro:0,dorado:0,cristal:0,mitico:0},
-      stats:{ partidas:0, combos:0, cofresAbiertos:0, babosas:0, jefes:0, ultis:0, danoTotal:0 },
-      logros:{}, racha:{ dias:0, ultima:'' }, desafios:{ fecha:'', lista:[] }
+      stats:{ partidas:0, combos:0, cofresAbiertos:0, babosas:0, jefes:0, ultis:0, danoTotal:0, criticos:0, cargasMax:0 },
+      logros:{}, racha:{ dias:0, ultima:'' }, desafios:{ fecha:'', lista:[] }, mute:false
     };
   }
   function normalizeSave(s){
@@ -147,6 +151,7 @@
     if(s.logros && typeof s.logros==='object') for(const k in s.logros){ if(s.logros[k]===true) o.logros[k]=true; }
     if(s.racha && typeof s.racha==='object'){ if(typeof s.racha.dias==='number'&&s.racha.dias>=0) o.racha.dias=Math.floor(s.racha.dias); if(typeof s.racha.ultima==='string') o.racha.ultima=s.racha.ultima; }
     if(s.desafios && typeof s.desafios==='object'){ if(typeof s.desafios.fecha==='string') o.desafios.fecha=s.desafios.fecha; if(Array.isArray(s.desafios.lista)) o.desafios.lista=s.desafios.lista.filter(d=>d&&typeof d.id==='string'); }
+    if(typeof s.mute==='boolean') o.mute = s.mute;
     return o;
   }
   let save = normalizeSave(loadSave());
@@ -185,8 +190,12 @@
     {id:'ola_25',           nombre:'Ola 25',            desc:'Llegá a la ola 25 en infinito', gemas:100, check:s=>s.mejorOla>=25},
     {id:'nivel_5',          nombre:'Nivel 5',           desc:'Llegá al nivel 5',              gemas:30,  check:s=>s.nivel>=5},
     {id:'nivel_12',         nombre:'¡Completaste el juego!',desc:'Llegá al nivel 12',        gemas:150, check:s=>s.nivel>=12},
-    {id:'racha_3',          nombre:'3 días seguidos',   desc:'Jugá 3 días seguidos',          gemas:50,  check:s=>s.racha.dias>=3},
-    {id:'racha_7',          nombre:'7 días seguidos',   desc:'Jugá 7 días seguidos',          gemas:150, check:s=>s.racha.dias>=7}
+    {id:'racha_3',         nombre:'3 días seguidos',   desc:'Jugá 3 días seguidos',          gemas:50,  check:s=>s.racha.dias>=3},
+    {id:'racha_7',         nombre:'7 días seguidos',   desc:'Jugá 7 días seguidos',          gemas:150, check:s=>s.racha.dias>=7},
+    {id:'combo_30',        nombre:'Combo x30',         desc:'Hacé un combo de 30',           gemas:90,  check:s=>s.stats.combos>=30},
+    {id:'critico_25',      nombre:'Francotirador',     desc:'25 impactos críticos',          gemas:40,  check:s=>s.stats.criticos>=25},
+    {id:'carga_max_25',    nombre:'A toda carga',      desc:'25 disparos a carga máxima',    gemas:45,  check:s=>s.stats.cargasMax>=25},
+    {id:'puntos_5000',     nombre:'Cinco mil puntos',  desc:'Sumá 5000 puntos en una partida', gemas:80, check:s=>s.mejorPuntaje>=5000}
   ];
   function checkLogros(){
     let nuevos = 0;
@@ -210,7 +219,7 @@
     {id:'jefes_1',      desc:'Derrotá 1 Guardián',      gemas:40,  metric:'jefes',     target:1},
     {id:'ultis_3',      desc:'Usá 3 habilidades',       gemas:25,  metric:'ultis',     target:3},
     {id:'dano_500',     desc:'Hacé 500 de daño',        gemas:20,  metric:'danoTotal',  target:500},
-    {id:'ola_5',        desc:'Llegá a la ola 5',        gemas:30,  metric:'mejorOla',   target:5}
+    {id:'ola_5',        desc:'Llegá a la ola 5',        gemas:30,  metric:'mejorOla',   target:5, max:true}
   ];
   function generarDesafios(){
     const hoy = hoyKey();
@@ -230,7 +239,10 @@
     if(save.desafios.fecha !== hoyKey()) return;
     save.desafios.lista.forEach(d=>{
       if(d.hecho || d.metric!==metric) return;
-      d.progreso = Math.min(d.target, d.progreso + value);
+      // 'max' = métrica de récord (mejorOla): toma el valor más alto, no la suma
+      d.progreso = d.max
+        ? Math.min(d.target, Math.max(d.progreso, value))
+        : Math.min(d.target, d.progreso + value);
       if(d.progreso >= d.target){
         d.hecho = true;
         save.gemas += d.gemas;
@@ -262,6 +274,20 @@
   const VEL = {rayo:0.95};
   function vel(el){ return VEL[el] || V0; }
   const GRAV = {fuego:0.00020, agua:0.00022, tierra:0.00028, aire:0.00013, hielo:0.00021, rayo:0.00006, planta:0.00019, sombra:0.00015};
+
+  // ======== POTENCIA DE TIRO (arrastre = carga) ========
+  // Arrastrar más lejos carga el tiro: +daño y ventaja elemental garantizada a
+  // carga máxima, PERO la recarga se alarga. Decisión real: spamear tiros
+  // flojos o comprometerse a uno pesado.
+  const POWER_MIN = 0.55, POWER_MAX = 1.60;
+  function powerFromDrag(dx,dy){
+    const d = Math.sqrt(dx*dx+dy*dy);
+    const t = Math.max(0, Math.min(1, (d-26)/150));
+    return POWER_MIN + (POWER_MAX-POWER_MIN)*t;
+  }
+  function cooldownFor(p){ return Math.round(300 + 320*p); }
+  function cargaMaxima(p){ return p >= POWER_MAX-0.02; }
+  function powerMult(p){ return 0.55 + 0.45*p; }
   function muzzlePos(ang){ return {x:LX+Math.cos(ang)*32, y:LY+Math.sin(ang)*32}; }
 
   // ---------- cuerpo de babosa ----------
@@ -457,7 +483,9 @@
   // ---------- audio ----------
   let audioCtx = null;
   function ensureAudio(){ if(!audioCtx){ const AC = window.AudioContext || window.webkitAudioContext; if(AC) audioCtx = new AC(); } return audioCtx; }
+  function toggleMute(){ save.mute = !save.mute; saveGame(); return save.mute; }
   function beep(freq,dur,type,vol){
+    if(save.mute) return;
     try{
       const ac = ensureAudio(); if(!ac) return;
       if(ac.state==='suspended' && ac.resume) ac.resume();
@@ -472,6 +500,7 @@
   }
   let noiseBuf = null;
   function noise(dur,type,f0,f1,vol){
+    if(save.mute) return;
     try{
       const ac = ensureAudio(); if(!ac) return;
       if(ac.state==='suspended' && ac.resume) ac.resume();
@@ -521,6 +550,9 @@
   let state = null;
   let running = false, animId = null, lastT = 0, finTimer = null;
   let aiming = false, aimPointer = null, aimX = LX, aimY = LY-40;
+  // apuntado por teclado (PC): ángulo + potencia, ajustable con flechas
+  let kbdAimAngle = -Math.PI/2, kbdPower = 1, kbdAimUsado = false;
+  const keys = Object.create(null);
 
   // ---------- enemigos (con esquiva) ----------
   function crearEnemigo(o){
@@ -570,7 +602,7 @@
       modo:modo, nivel:L||0, idx:0, wave:1, n: modo==='nivel' ? NIVELES[L-1].n : 0,
       enemy:null, projectiles:[], enemyShots:[], particles:[], bolts:[], drops:[],
       player:{hp:100,maxHp:100}, selected:equipo[0], equipo:equipo, rar:rar,
-      cooldown:0, recoil:0, aimAngle:-Math.PI/2, waveTransition:0, combo:0, maxCombo:0, score:0, shake:0, flash:0,
+      cooldown:0, cooldownMax:480, recoil:0, aimAngle:-Math.PI/2, aimPower:1, waveTransition:0, combo:0, maxCombo:0, comboT:0, score:0, shake:0, flash:0,
       cofresRun:0, bannerT:2400,
       ultiCharge:0, ultiMax:100, ultiFxT:0, eclipseLeft:0,
       bannerText: modo==='nivel' ? 'Nivel '+L : 'Modo infinito',
@@ -634,6 +666,11 @@
     if(state.bannerT>0) state.bannerT = Math.max(0, state.bannerT-dt);
     if(state.ultiFxT>0) state.ultiFxT = Math.max(0, state.ultiFxT-dt);
     if(state.eclipseLeft>0) state.eclipseLeft = Math.max(0, state.eclipseLeft-dt);
+    // el combo caduca si dejás de acertar: mantenerlo es una decisión
+    if(state.combo>0 && state.comboT>0){
+      state.comboT -= dt;
+      if(state.comboT<=0){ state.combo = 0; state.comboT = 0; }
+    }
     for(let i=state.bolts.length-1;i>=0;i--){ state.bolts[i].life -= dt; if(state.bolts[i].life<=0) state.bolts.splice(i,1); }
     for(let i=state.drops.length-1;i>=0;i--){ state.drops[i].t += dt; if(state.drops[i].t>=state.drops[i].dur) state.drops.splice(i,1); }
   }
@@ -650,44 +687,50 @@
     addTextParticle(LX, LY-44, '+'+Math.round(n), '#7fb87f', 11);
   }
 
-  function applyHit(elKey, isCrit, r){
+  function applyHit(elKey, isCrit, r, power){
     const en = state.enemy;
     let mult = 1;
     if(vence(elKey,en.tipo)) mult = 2;
     else if(vence(en.tipo,elKey)) mult = (elKey==='aire') ? 1 : 0.5;
     state.combo = (state.combo||0)+1;
     state.maxCombo = Math.max(state.maxCombo, state.combo);
+    state.comboT = 5000;                       // el combo caduca: hay que mantener presión
     save.stats.combos++;
     actualizarDesafios('combos', 1);
+    const pw = (power==null || isNaN(power)) ? 1 : Math.max(POWER_MIN, Math.min(POWER_MAX, power));
+    const max = cargaMaxima(pw);
     const comboMult = 1 + Math.min(state.combo-1,5)*0.1;
     const critMult = isCrit ? 1.5 : 1;
     const rm = RAREZA[r].mult * (elKey==='rayo' ? 0.9 : 1);
     const eclipseMult = state.eclipseLeft>0 ? 3 : 1;
-    const dmg = Math.round(16*mult*comboMult*critMult*rm*eclipseMult);
+    const dmg = Math.round(16*mult*comboMult*critMult*rm*eclipseMult*powerMult(pw)*(max?1.25:1));
     en.hp = Math.max(0, en.hp-dmg);
     en.hitT = 140;
     state.score += dmg;
     state.ultiCharge = Math.min(state.ultiMax, state.ultiCharge + dmg*0.5);
     save.stats.danoTotal += dmg;
+    if(isCrit) save.stats.criticos++;
+    if(max) save.stats.cargasMax++;
     actualizarDesafios('danoTotal', dmg);
     addParticles(en.x, en.y-en.r*0.2, ELEMENT_INFO[elKey].color, isCrit?18:11, elKey);
     let label = '-'+dmg;
     if(mult===2) label += ' ▲'; else if(mult<1) label += ' ▼';
     addTextParticle(en.x+(Math.random()-0.5)*16, en.y-en.r-14, label, isCrit?UI.accent:UI.ink, isCrit?14:12);
+    if(max) addTextParticle(en.x+(Math.random()-0.5)*22, en.y-en.r-32, '⚡ CARGA MÁX', '#ffc371', 11);
     sfxHit();
     if(isCrit){ sfxCrit(); state.shake = Math.max(state.shake,4); }
-    // efectos elementales al impactar
-    if(elKey==='fuego'){ en.burnTicks=3; en.burnDamage=4; en.burnTimer=0; }
-    else if(elKey==='agua'){ en.slowLeft = 2600; }
-    else if(elKey==='tierra'){ if(Math.random()<0.35){ en.atkTimer=0; addTextParticle(en.x, en.y-en.r-30,'Aturdido', ELEMENT_INFO.tierra.color, 10); } }
+    // efectos elementales al impactar — a carga máxima el efecto está GARANTIZADO
+    if(elKey==='fuego'){ en.burnTicks = max?5:3; en.burnDamage = max?6:4; en.burnTimer=0; }
+    else if(elKey==='agua'){ en.slowLeft = max ? 4000 : 2600; }
+    else if(elKey==='tierra'){ if(max || Math.random()<0.35){ en.atkTimer=0; addTextParticle(en.x, en.y-en.r-30,'Aturdido', ELEMENT_INFO.tierra.color, 10); } }
     else if(elKey==='hielo'){
-      if(Math.random()<0.4 && en.hp>0){
-        en.freezeLeft = 1100;
+      if((max || Math.random()<0.4) && en.hp>0){
+        en.freezeLeft = max ? 1800 : 1100;
         addTextParticle(en.x, en.y-en.r-30, 'Congelado', ELEMENT_INFO.hielo.color, 10);
       }
     }
     else if(elKey==='rayo'){
-      if(Math.random()<0.35 && en.hp>0){
+      if((max || Math.random()<0.35) && en.hp>0){
         const extra = Math.max(1, Math.round(dmg*0.5));
         en.hp = Math.max(0, en.hp-extra);
         state.score += extra;
@@ -695,8 +738,8 @@
         addTextParticle(en.x+16, en.y-en.r-26, '-'+extra+' cadena', ELEMENT_INFO.rayo.color, 10);
       }
     }
-    else if(elKey==='planta'){ curarJugador(Math.max(1, Math.round(dmg*0.15))); }
-    else if(elKey==='sombra'){ curarJugador(Math.max(1, Math.round(dmg*0.2))); addTextParticle(en.x-16, en.y-en.r-30, 'Robo', ELEMENT_INFO.sombra.color, 9); }
+    else if(elKey==='planta'){ curarJugador(Math.max(1, Math.round(dmg*(max?0.22:0.15)))); }
+    else if(elKey==='sombra'){ curarJugador(Math.max(1, Math.round(dmg*(max?0.28:0.2)))); addTextParticle(en.x-16, en.y-en.r-30, 'Robo', ELEMENT_INFO.sombra.color, 9); }
   }
 
   // ======== HABILIDAD DEFINITIVA ========
@@ -758,18 +801,23 @@
     }
   }
 
-  function fire(dirX,dirY){
+  function fire(dirX,dirY,power){
     if(!state || state.waveTransition>0) return false;
     if(state.cooldown>0) return false;
     if(dirY >= -5) return false;
     const ang = Math.atan2(dirY,dirX);
     const el = state.selected;
     const m = muzzlePos(ang);
-    const v0 = vel(el);
+    const pw = (power==null || isNaN(power)) ? 1 : Math.max(POWER_MIN, Math.min(POWER_MAX, power));
+    const v0 = vel(el)*pw;
     const vx0 = Math.cos(ang)*v0, vy0 = Math.sin(ang)*v0;
-    state.projectiles.push({x:m.x,y:m.y,x0:m.x,y0:m.y,vx0:vx0,vy0:vy0,vx:vx0,vy:vy0,age:0,el:el,r:state.rar[el],trail:[]});
+    state.projectiles.push({x:m.x,y:m.y,x0:m.x,y0:m.y,vx0:vx0,vy0:vy0,vx:vx0,vy:vy0,age:0,el:el,r:state.rar[el],trail:[],power:pw});
     state.aimAngle = ang;
-    state.cooldown = 480; state.recoil = 140;
+    state.aimPower = pw;
+    // tradeoff: más carga = más daño, pero recarga más larga
+    state.cooldownMax = cooldownFor(pw);
+    state.cooldown = state.cooldownMax;
+    state.recoil = 140;
     addParticles(m.x, m.y, '#bdb4a8', 5, 'aire');
     playFireTone(el);
     return true;
@@ -800,6 +848,20 @@
   }
 
   function update(dt){
+    // ======== apuntado por teclado (PC) ========
+    if(!aiming){
+      const paso = 0.030*(dt/16.667);
+      if(keys['ArrowLeft'] || keys['ArrowRight']){
+        kbdAimAngle += (keys['ArrowLeft']?1:-1)*paso;
+        kbdAimAngle = Math.max(-Math.PI+0.10, Math.min(-0.10, kbdAimAngle));
+        kbdAimUsado = true;
+      }
+      if(keys['ArrowUp'] || keys['ArrowDown']){
+        kbdPower = Math.max(POWER_MIN, Math.min(POWER_MAX, kbdPower + (keys['ArrowUp']?1:-1)*0.014*(dt/16.667)));
+        kbdAimUsado = true;
+      }
+      if(kbdAimUsado && state){ state.aimAngle = kbdAimAngle; state.aimPower = kbdPower; }
+    }
     if(aiming && aimY < LY-5) state.aimAngle = Math.atan2(aimY-LY, aimX-LX);
     if(state.cooldown>0) state.cooldown = Math.max(0, state.cooldown-dt);
     if(state.recoil>0) state.recoil = Math.max(0, state.recoil-dt);
@@ -849,7 +911,7 @@
         addParticles(p.x, FLOOR_Y-2, ELEMENT_INFO[p.el].color, p.meteor?16:8, p.el);
         if(p.meteor && en.hp>0){
           const dx = p.x - en.x;
-          if(Math.abs(dx) < en.r*1.6) applyHit(p.el, false, p.r);
+          if(Math.abs(dx) < en.r*1.6) applyHit(p.el, false, p.r, p.power||1);
         }
         state.projectiles.splice(i,1); state.combo = 0; continue;
       }
@@ -871,7 +933,7 @@
       const dx=p.x-en.x, dy=p.y-en.y;
       const nx=dx/(en.r*1.4+5), ny=dy/(en.r*0.95+5);
       if(nx*nx+ny*ny<1){
-        applyHit(p.el, Math.sqrt(dx*dx+dy*dy)<12, p.r);
+        applyHit(p.el, Math.sqrt(dx*dx+dy*dy)<12, p.r, p.power);
         state.projectiles.splice(i,1);
       }
     }
@@ -1057,7 +1119,8 @@
 
   function drawLauncher(){
     const ang = state.aimAngle;
-    const ready = 1-Math.min(1,state.cooldown/480);
+    const cMax = state.cooldownMax || 480;
+    const ready = 1-Math.min(1,state.cooldown/cMax);
     const rec = state.recoil>0 ? state.recoil/140 : 0;
     const col = ELEMENT_INFO[state.selected].color;
     groundShadow(LX, FLOOR_Y, 36, 0.6);
@@ -1083,30 +1146,64 @@
     ctx.restore();
     if(rec>0.4){ const m = muzzlePos(ang); glow(m.x,m.y,26,col,rec*0.6); }
     if(state.cooldown>0){
-      const pct = state.cooldown/480;
+      const pct = state.cooldown/cMax;
       ctx.fillStyle = 'rgba(255,255,255,.08)'; ctx.fillRect(LX-30, LY+34, 60,3);
       ctx.fillStyle = UI.ink; ctx.fillRect(LX-30, LY+34, 60*(1-pct),3);
     }
   }
 
+  function drawPowerMeter(pw, full){
+    const t = (pw-POWER_MIN)/(POWER_MAX-POWER_MIN);
+    const bx = 12, by = 214, bw = 7, bh = 150;
+    ctx.save();
+    ctx.fillStyle = 'rgba(0,0,0,.45)'; ctx.fillRect(bx,by,bw,bh);
+    const h = bh*Math.max(0.02,t);
+    const g2 = ctx.createLinearGradient(0,by+bh,0,by);
+    g2.addColorStop(0, UI.accent); g2.addColorStop(0.65,'#ffc371'); g2.addColorStop(1,'#ff5f6d');
+    ctx.fillStyle = g2; ctx.fillRect(bx, by+bh-h, bw, h);
+    ctx.strokeStyle='rgba(255,255,255,.16)'; ctx.lineWidth=1; ctx.strokeRect(bx,by,bw,bh);
+    // marca de carga máxima
+    const yMax = by + bh*(1-1);
+    ctx.fillStyle = 'rgba(255,255,255,.55)'; ctx.fillRect(bx-2, yMax, bw+4, 1);
+    ctx.fillStyle = full ? UI.ink : 'rgba(234,234,242,.5)';
+    ctx.font='8px sans-serif'; ctx.textAlign='left';
+    ctx.fillText('POTENCIA', bx, by-16);
+    ctx.fillText(Math.round(t*100)+'%', bx, by+bh+11);
+    if(t>=0.999){
+      ctx.fillStyle='#fff'; ctx.font='bold 8px sans-serif';
+      ctx.fillText('MÁX', bx+bw+3, by+8);
+    }
+    ctx.restore();
+  }
+
   function drawAimPreview(){
-    if(!aiming) return;
-    const adx = aimX-LX, ady = aimY-LY;
-    if(ady >= -5) return;
-    const ang = Math.atan2(ady,adx);
+    if(!state || gameState!=='playing') return;
+    let ang, pw, full;
+    if(aiming){
+      const adx = aimX-LX, ady = aimY-LY;
+      if(ady >= -5) return;
+      ang = Math.atan2(ady,adx);
+      pw = powerFromDrag(adx,ady);
+      full = true;
+    } else {
+      if(!kbdAimUsado) return;      // en táctil la guía aparece al arrastrar
+      ang = kbdAimAngle; pw = kbdPower; full = false;
+    }
     const m = muzzlePos(ang);
-    const v0 = vel(state.selected);
+    const v0 = vel(state.selected)*pw;          // la trayectoria usa la potencia REAL
     const vx0 = Math.cos(ang)*v0, vy0 = Math.sin(ang)*v0, g = GRAV[state.selected];
     const listo = state.cooldown<=0 && state.waveTransition<=0;
+    const baseA = full ? 0.82 : 0.40;
     ctx.save();
     ctx.fillStyle = ELEMENT_INFO[state.selected].color;
     for(let t=50, n=0; t<3200 && n<60; t+=42, n++){
       const x = m.x+vx0*t, y = m.y+vy0*t+0.5*g*t*t;
       if(x<-10||x>W+10||y>FLOOR_Y) break;
-      ctx.globalAlpha = (listo?0.8:0.25)*(1-n/70);
+      ctx.globalAlpha = (listo?baseA:baseA*0.3)*(1-n/70);
       ctx.beginPath(); ctx.arc(x,y,1.7,0,Math.PI*2); ctx.fill();
     }
     ctx.restore();
+    drawPowerMeter(pw, full);
   }
 
   function drawSelector(){
@@ -1207,6 +1304,12 @@
       if(state.combo>1){
         ctx.fillStyle = UI.accent; ctx.font = '500 10px sans-serif';
         ctx.fillText('Combo x'+state.combo, W/2, 34);
+        // barra de caducidad del combo
+        if(state.comboT>0 && state.comboT<4200){
+          const cw = 54, cp = Math.max(0, state.comboT/5000);
+          ctx.fillStyle = 'rgba(255,255,255,.12)'; ctx.fillRect(W/2-cw/2, 38, cw, 2.5);
+          ctx.fillStyle = cp>0.4 ? UI.accent : '#c96b5a'; ctx.fillRect(W/2-cw/2, 38, cw*cp, 2.5);
+        }
       }
       if(state.eclipseLeft>0){
         ctx.fillStyle = ELEMENT_INFO.sombra.color; ctx.font = '500 10px sans-serif';
@@ -1300,8 +1403,9 @@
     if(!aiming || e.pointerId!==aimPointer) return;
     aiming = false; aimPointer = null;
     if(gameState==='playing' && state){
+      const dx = aimX-LX, dy = aimY-LY;
       const bloqueadoPorRecarga = state.cooldown>0 && state.waveTransition<=0;
-      const ok = fire(aimX-LX, aimY-LY);
+      const ok = fire(dx, dy, powerFromDrag(dx,dy));   // la distancia del arrastre = potencia
       if(!ok && bloqueadoPorRecarga) sfxDenied();
     }
   }
@@ -1312,29 +1416,65 @@
 
   // ---------- flujo ----------
   function programarFin(fn, ms){ if(finTimer) clearTimeout(finTimer); finTimer = setTimeout(()=>{ finTimer=null; fn(); }, ms); }
+
+  // ======== PAUSA ========
+  function togglePause(){
+    if(gameState==='playing'){
+      gameState = 'paused';
+      running = false;
+      if(animId) cancelAnimationFrame(animId);
+      animId = null;
+      showPauseOverlay();
+    } else if(gameState==='paused'){
+      hideOverlay();
+      gameState = 'playing';
+      running = true; lastT = 0;
+      animId = requestAnimationFrame(loop);
+    }
+  }
+  function showPauseOverlay(){
+    const modo = state ? state.modo : 'nivel';
+    const donde = state ? (modo==='nivel' ? 'Nivel '+state.nivel+' · '+NIVELES[state.nivel-1].nombre : 'Ola '+state.wave) : '';
+    showOverlay(
+      '<h2>Pausa</h2>'
+      +'<p>'+donde+' · '+state.score+' pts</p>'
+      +'<button class="btn" id="btnSeguir">Seguir jugando</button>'
+      +'<button class="btn btnAlt" id="btnReiniciar">Reiniciar</button>'
+      +'<button class="btn btnAlt" id="btnMuteBtn">'+(save.mute?'🔇 Sonido: apagado':'🔊 Sonido: encendido')+'</button>'
+      +'<button class="btn btnAlt" id="btnSalirP">Salir al menú</button>'
+      +'<p style="font-size:11px;">Flechas: apuntar · ↑↓: potencia · Espacio: disparar<br>U: ULTI · P: pausa · M: sonido · 1-8: elemento</p>'
+    );
+    bind('btnSeguir', togglePause);
+    bind('btnReiniciar', ()=>{ if(state) iniciar(state.modo, state.nivel); });
+    bind('btnMuteBtn', ()=>{ toggleMute(); showPauseOverlay(); });
+    bind('btnSalirP', salir);
+  }
+
   function detenerJuego(){
     running = false;
     if(animId) cancelAnimationFrame(animId);
     animId = null;
     if(finTimer){ clearTimeout(finTimer); finTimer = null; }
     state = null; aiming = false; aimPointer = null; gameState = 'menu';
-    exitBtn.style.display = 'none';
+    exitBtn.style.display = 'none'; pauseBtn.style.display = 'none';
     drawBackdrop();
   }
   function iniciar(modo, L){
     detenerJuego();
     state = nuevoEstado(modo, L);
     gameState = 'playing';
-    exitBtn.style.display = 'flex';
+    exitBtn.style.display = 'flex'; pauseBtn.style.display = 'flex';
     hideOverlay();
     running = true; lastT = 0;
+    kbdPower = 1; kbdAimAngle = -Math.PI/2; kbdAimUsado = false;
+    for(const k in keys) keys[k] = false;
     animId = requestAnimationFrame(loop);
   }
   function salir(){ if(state && state.modo==='nivel') renderNiveles(); else renderMenu(); }
 
   function ganarNivel(){
     running = false; gameState = 'victoria';
-    exitBtn.style.display = 'none';
+    exitBtn.style.display = 'none'; pauseBtn.style.display = 'none';
     const L = state.nivel;
     const frac = state.player.hp/state.player.maxHp;
     const estrellas = frac>=0.7 ? 3 : (frac>=0.35 ? 2 : 1);
@@ -1376,7 +1516,7 @@
 
   function endGame(){
     running = false; gameState = 'gameover';
-    exitBtn.style.display = 'none';
+    exitBtn.style.display = 'none'; pauseBtn.style.display = 'none';
     sfxLose();
     const nivel = state.modo==='nivel';
     const extra = state.cofresRun;
@@ -1466,7 +1606,7 @@
     const rachaTxt = save.racha.dias>0 ? '🔥 Racha: '+save.racha.dias+' día'+(save.racha.dias>1?'s':'') : '🔥 Racha: 0 días';
     showOverlay(
       '<h2>Lanzador de Cavernas 2</h2>'
-      +'<p>Nueva versión: 8 elementos, ulti cargada por combo, babosas <span style="color:#ff5f6d;">Legendarias</span> y enemigos que esquivan.</p>'
+      +'<p>Nueva versión: <b>potencia de tiro</b> (arrastrá más lejos = más daño), pausa, controles de teclado, '+LOGROS.length+' logros y sonido silenciable.</p>'
       +'<p style="font-size:12px;color:#ffd700;">'+rachaTxt+'</p>'
       +'<button class="btn" id="btnNiveles">Niveles</button>'
       +'<button class="btn btnAlt" id="btnInfinito">Modo infinito</button>'
@@ -1475,6 +1615,7 @@
       +'<button class="btn btnAlt" id="btnDesafios">Desafíos diarios</button>'
       +'<button class="btn btnAlt" id="btnLogros">Logros '+logrosCount+'/'+LOGROS.length+'</button>'
       +'<button class="btn btnAlt" id="btnAyuda">Cómo jugar</button>'
+      +'<p style="font-size:11px;color:#8a8a99;">PC: flechas + espacio · P pausa · M sonido'+(save.mute?' · 🔇 silencio':'')+'</p>'
       +'<p style="font-size:12px;color:#6ad4ff;">Gemas: '+save.gemas+' · Récord infinito: ola '+save.mejorOla+' · '+save.mejorPuntaje+' pts</p>'
     );
     bind('btnNiveles', renderNiveles);
@@ -1646,16 +1787,54 @@
     const habil = ELKEYS.map(el=>'<span style="color:'+ELEMENT_INFO[el].color+';"><b>'+ELEMENT_INFO[el].nombre+'</b></span>: '+ELEMENT_INFO[el].habilidad+'<br><span style="color:#ff5f6d;font-size:10px;">ULTI: '+ELEMENT_INFO[el].ulti+'</span>').join('<br>');
     showOverlay(
       '<h2>Cómo jugar</h2>'
-      +'<p>Arrastra para apuntar y suelta para disparar. Puedes interceptar los escupitajos del rival. La barra de arriba del selector carga tu <b>habilidad definitiva</b> con cada acierto.</p>'
+      +'<p>Arrastra para apuntar y <b>soltá</b> para disparar. Podés interceptar los escupitajos del rival. La barra de arriba del selector carga tu <b>habilidad definitiva</b> con cada acierto.</p>'
+      +'<p style="text-align:left;font-size:12px;color:#ffc371;"><b>⚡ Potencia de tiro</b><br>Cuanto más lejos arrastres, más potente es el disparo: más daño y el efecto elemental <b>garantizado</b> a carga máxima (marca MÁX). Pero la recarga se alarga. Espamear tiros flojos o comprometerse a uno pesado es la decisión central.</p>'
+      +'<p style="text-align:left;font-size:12px;color:#6ad4ff;"><b>Teclado (PC)</b><br>← → apuntar · ↑ ↓ potencia · Espacio disparar · 1-8 elemento · U ULTI · P pausa · M sonido · R reiniciar</p>'
       +'<p style="text-align:left;font-size:11px;">'+ventajas+'</p>'
       +'<p style="text-align:left;font-size:11px;">'+habil+'</p>'
-      +'<p>Cada nivel termina con un Guardián. Ganas gemas y cofres. Los enemigos pueden <b>esquivar</b>: la probabilidad sube con el nivel.</p>'
+      +'<p>Cada nivel termina con un Guardián. Ganás gemas y cofres. Los enemigos pueden <b>esquivar</b>: la probabilidad sube con el nivel. El <b>combo</b> caduca a los 5 segundos sin acertar.</p>'
       +'<button class="btn btnAlt" id="btnVolver">Volver</button>'
     );
     bind('btnVolver', renderMenu);
   }
 
+  // ======== CONTROLES DE TECLADO (PC) ========
+  function seleccionarPorIndice(i){
+    if(gameState!=='playing' || !state || !state.equipo) return;
+    if(i<0 || i>=state.equipo.length) return;
+    state.selected = state.equipo[i];
+    kbdAimUsado = true;
+    playSelectTone(state.selected);
+  }
+  function dispararConTeclado(){
+    if(gameState!=='playing' || !state) return;
+    const a = kbdAimAngle;
+    fire(Math.cos(a)*100, Math.sin(a)*100, kbdPower);
+  }
+  function onKeyDown(e){
+    const k = e.key;
+    if(k===' '||k==='Spacebar'||k.slice(0,5)==='Arrow'){ if(e.preventDefault) e.preventDefault(); }
+    if(k===' '||k==='Spacebar'){ dispararConTeclado(); return; }
+    if(k==='p'||k==='P'||k==='Escape'){ if(gameState==='playing'||gameState==='paused') togglePause(); return; }
+    if(k==='m'||k==='M'){ toggleMute(); if(gameState==='paused') showPauseOverlay(); return; }
+    if(k==='u'||k==='U'){ if(gameState==='playing'&&state&&state.ultiCharge>=state.ultiMax) lanzarUlti(); return; }
+    if(k==='r'||k==='R'){ if((gameState==='playing'||gameState==='paused')&&state) iniciar(state.modo, state.nivel); return; }
+    if(k>='1'&&k<='8'){ seleccionarPorIndice(parseInt(k,10)-1); return; }
+  }
+  window.addEventListener('keydown', (e)=>{
+    keys[e.key] = true;
+    if(e.repeat) return;          // las acciones discretas no se repiten al mantener
+    onKeyDown(e);
+  });
+  window.addEventListener('keyup', (e)=>{ keys[e.key] = false; });
+  window.addEventListener('blur', ()=>{ for(const k in keys) keys[k] = false; });
+  // pausa automática al cambiar de pestaña: nadie quiere perder vida mirando otro lado
+  document.addEventListener('visibilitychange', ()=>{
+    if(document.hidden && gameState==='playing') togglePause();
+  });
+
   exitBtn.addEventListener('click', salir);
+  pauseBtn.addEventListener('click', ()=>{ if(gameState==='playing'||gameState==='paused') togglePause(); });
   bgCanvas = buildBackground();
   renderMenu();
 })();
