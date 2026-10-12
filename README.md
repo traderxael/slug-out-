@@ -94,6 +94,24 @@ cruzar la pantalla y aguanta 40 de daño base.
 Lo que agrega esto no es contenido: es una decisión más por tiro. Antes la única
 pregunta era *cuánto cargo*; ahora es *cuánto cargo* y *por dónde*.
 
+## 🛡️ Arquetipos de enemigo: variedad que obliga a responder distinto
+
+No son más babosas del mismo molde: son tres comportamientos que fuerzan una
+decisión distinta. Cada uno **avisa** antes de actuar.
+
+| Arquetipo | Desde | Qué hace | Tu decisión |
+|---|---|---|---|
+| 🛡️ **Escudado** | nivel 4 (ola 6) | Levanta un escudo que **absorbe el tiro**. El anillo cian se cierra 480 ms antes de subir | Esperar a que baje, cambiar de elemento, o gastar el tiro a propósito |
+| 🦗 **Saltarín** | nivel 7 (ola 10) | Se agacha 260 ms y **salta** ~54 px | Leer la altura antes de tirar |
+| 😤 **Frenético** | todos los jefes | Al 50% de vida **se enfurece**: aura roja, +40% velocidad, ataca cada 0.65× el intervalo | Bajarlo de golpe o bancarse la andanada |
+
+El escudo dura 900 ms y cicla cada 2.6 s; el salto cada 2.2 s. La furia es
+irreversible — es la fase 2 del jefe.
+
+Lo que agrega esto no es contenido: son tres decisiones más. Con las rocas, cada
+tiro ahora se responde a *cuánto cargo*, *por dónde* y *cuándo* — y contra cada
+enemigo, *qué*.
+
 ## ⚔️ Elementos
 
 | Elemento | Habilidad | ULTI |
@@ -152,14 +170,32 @@ node test-obstaculos-amenaza.cjs      # la roca golpea al jugador solo en su col
 # 9. Las rocas EN JUEGO: que el tell y la roca se VEAN (delta contra la linea base)
 "C:/Users/USUARIO/AppData/Local/Programs/Python/Python312/python.exe" test-obstaculos-visual.py
 
-# 10. El juego YA PUBLICADO, cargado desde la URL de produccion
+# 10-15. Arquetipos: absorcion del escudo, su ciclo telegrafiado, el salto, la
+#        furia, la asignacion por nivel y LO QUE SE DIBUJA de cada uno
+node test-arquetipo-escudado.cjs
+node test-arquetipo-escudado-ciclo.cjs
+node test-arquetipo-saltarin.cjs
+node test-arquetipo-frenetico.cjs
+node test-arquetipos-asignacion.cjs
+node test-arquetipos-visual.cjs
+
+# 16. End-to-end en Edge real: el juego corre sin errores y la furia se ve jugando
+"C:/Users/USUARIO/AppData/Local/Programs/Python/Python312/python.exe" test-arquetipos-browser.py
+
+# 17. El juego YA PUBLICADO, cargado desde la URL de produccion
 "C:/Users/USUARIO/AppData/Local/Programs/Python/Python312/python.exe" qa-live.py
 ```
 
-Las suites 3-6 se escribieron **primero que el código** (TDD): cada una se vio
-fallar por el motivo correcto antes de implementar. La 9 mide el **delta** contra
-la línea base porque la cornisa y el fondo ya son marrones y suman píxeles aunque
-no haya ninguna roca: medir absolutos habría dado un falso positivo.
+La suite 15 no cuenta píxeles: usa el modo de grabación del harness
+(`buildGame({ recordDraw: true })`), que anota el estilo vigente en cada
+`stroke()`/`fill()`. Era la única forma honesta de verificar el dibujo, porque el
+escudo cian `(127,212,255)` y el proyectil de hielo `#6fd6e6` son casi el mismo
+tono: un conteo por color habría dado un falso positivo permanente.
+
+Las suites 3-6 y 10-15 se escribieron **primero que el código** (TDD): cada una se
+vio fallar por el motivo correcto antes de implementar. La 9 mide el **delta**
+contra la línea base porque la cornisa y el fondo ya son marrones y suman píxeles
+aunque no haya ninguna roca: medir absolutos habría dado un falso positivo.
 
 La suite 2 mide, entre otras cosas, que un tiro a potencia baja se detiene en `y≈368`
 y uno a potencia máxima en `y≈280` del canvas (predicción teórica: 375 y 287), que el
