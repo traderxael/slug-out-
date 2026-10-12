@@ -68,7 +68,7 @@ test de Node puede recorrer `victoria → historia → siguiente nivel` completo
 ### Combate del rival
 993 `curarEnemigo` · **1006 `lanzarHabilidad` (las 8 habilidades elementales)** ·
 1060 `siguienteEnemigo` · **1075 `update` — la IA completa** ·
-**1136-1141 la esquiva del rival** · 1251 el aturdimiento · 1264-1273 movimiento y límites
+**1136-1141 la esquiva del rival** (radio `70 + evasion*200`, determinista) · 1251 el aturdimiento · 1264-1273 movimiento y límites
 
 ### Obstáculos
 874 `danoDeRoca` · 882 `intervaloRoca` · 890 `spawnRoca` · 1827 `drawRocas`
@@ -107,27 +107,38 @@ arquetipo obliga a una respuesta distinta y **avisa** antes de actuar.
 
 ## Pendientes
 
-### 1. La esquiva del rival es por probabilidad 🔴
+### 1. La esquiva del rival es por probabilidad ✅ HECHO
 
-`index.html:1136-1137`
+`index.html:1136-1137` (ya no existe)
 
 ```js
+// ANTES
 if(amenaza && en.dodgeCd<=0 && ... && Math.random()<en.evasion*dt/80){
 ```
 
 El proyecto se sostiene sobre un principio: **todo avisa, se lee, no se adivina**.
 Las rocas tiemblan antes de caer, el escudado cierra un anillo, el saltarín se
-agacha. Pero el *disparo* de la esquiva es un dado: el jugador no puede prepararse
-para algo que a veces pasa y a veces no, así que la única respuesta posible es
+agacha. Pero el *disparo* de la esquiva era un dado: el jugador no podía prepararse
+para algo que a veces pasa y a veces no, así que la única respuesta posible era
 disparar más veces y rezar.
 
-**El arreglo:** esquivar siempre que un proyectil sea amenaza real (dentro de un
-cono de llegada, a menos de N píxeles), nunca por azar. El tell de 200ms ya
-existe; lo que falta es que sea *determinista*. Así el jugador aprende una regla
-legible: *"si tiro mientras el tell está puesto, gasto el tiro"*.
+**Cómo se arregló:** la evasión dejó de ser probabilidad y pasó a ser **a qué
+distancia ve venir el tiro**:
 
-**Test primero (RED):** con el mismo proyectil y el mismo estado, el rival esquiva
-siempre — o nunca. Ninguna de las dos depende de `Math.random()`.
+```js
+const radioDeteccion = 70 + Math.max(0, en.evasion)*200;
+if(amenaza && en.evasion>0 && dyAmenaza < radioDeteccion && ...)
+```
+
+Con la misma amenaza y el mismo estado, el rival reacciona **siempre igual**. Más
+evasión = más radio = el tell aparece más temprano y cuesta más cortarlo, y la
+progresión por nivel se mantiene. La fórmula está calzada para que a potencia
+máxima el tiro llegue en `194 ms` contra los `200 ms` del tell: **interrumpe en
+todos los niveles**, incluso contra el jefe. El counterplay de potencia no se tocó.
+
+**Tests:** `test-esquiva-determinista.cjs` (60 de 60 reaccionan, antes 5 de 60) y
+`test-esquiva-browser.py` (el tell se dibuja y la esquiva completa de verdad).
+`test-esquiva-balance.cjs` se reescribió porque extraía el `dy<160` que se quitó.
 
 ### 2. Candidatos (ideas, no compromisos)
 

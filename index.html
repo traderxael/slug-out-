@@ -1106,10 +1106,11 @@
     // aturdido. Esto convierte el azar en lectura, y crea el ida y vuelta:
     // mirar el tell y castigar, o provocarlo con un tiro flojo.
     //
-    // Balance: el rival detecta la amenaza a 160px. A potencia máxima el
-    // proyectil tarda ~178ms en llegar, así que INTERRUMPE. A potencia media
-    // (~286ms) corta el movimiento de esquiva. A potencia mínima (~516ms)
-    // llega tarde y ya se movió. Más carga = más fiable contra la evasión.
+    // Balance: el radio de deteccion crece con la evasion, asi que a mas nivel
+    // el tell aparece mas temprano. A potencia maxima el proyectil tarda ~178ms
+    // en llegar, asi que INTERRUMPE (llega dentro del tell). A potencia media
+    // (~286ms) corta el movimiento de esquiva. A potencia minima (~516ms) llega
+    // tarde y ya se movio. Mas carga = mas fiable contra la evasion.
     if(en.dodgeCd>0) en.dodgeCd -= dt;
     if(en.stunT>0) en.stunT = Math.max(0, en.stunT-dt);
     if(en.dodgeWindup>0){
@@ -1118,7 +1119,7 @@
     } else if(en.dodgeT>0){
       en.dodgeT -= dt; en.x += en.dodgeVx*dt;
     }
-    let amenaza = null, closer = 1e9;
+    let amenaza = null, closer = 1e9, dyAmenaza = 0;
     for(const p of state.projectiles){
       // Solo cuenta lo que SUBE hacia el rival. Con `vy<=0` se descartaba
       // justo el tiro entrante, y con `dy = en.y - p.y` la distancia daba
@@ -1128,14 +1129,32 @@
       if(p.vy>=0) continue;
       const dx = Math.abs(p.x - en.x);
       const dy = p.y - en.y;          // positivo = el proyectil esta DEBAJO, acercandose
-      if(dy>0 && dy<160 && dx<50 && dx/dy < 0.6){
+      if(dy>0 && dx<50 && dx/dy < 0.6){
         const d = dy;
-        if(d<closer){ closer = d; amenaza = p; }
+        if(d<closer){ closer = d; amenaza = p; dyAmenaza = d; }
       }
     }
-    if(amenaza && en.dodgeCd<=0 && en.stunT<=0 && en.dodgeWindup<=0 && en.dodgeT<=0
-       && Math.random()<en.evasion*dt/80){
+    // La evasion deja de ser un DADO y pasa a ser A QUE DISTANCIA ve venir el
+    // tiro. Antes el disparo era `Math.random()<en.evasion*dt/80`: el rival a
+    // veces esquivaba y a veces no, y el jugador no podia prepararse para nada
+    // — la unica respuesta posible era disparar mas veces y rezar. Eso rompia la
+    // regla del proyecto: todo avisa, se lee, no se adquína.
+    //
+    // Ahora, con la misma amenaza y el mismo estado, reacciona SIEMPRE igual.
+    // Mas evasion = mas radio = el tell aparece mas temprano y cuesta mas
+    // cortarlo, y la progresion por nivel se mantiene. El counterplay de
+    // potencia (test-esquiva-balance) queda intacto.
+    // 70px de base y 200px por punto de evasion: en el jefe (evasion 0.50, el
+    // maximo) el radio queda en 170px, y a potencia maxima el tiro tarda ~194ms
+    // en recorrerlos — dentro de los 200ms del tell. La formula esta calzada a
+    // proposito para que la carga maxima SIEMPRE interrumpa, en todo nivel.
+    const radioDeteccion = 70 + Math.max(0, en.evasion)*200;
+    if(amenaza && en.evasion>0 && dyAmenaza < radioDeteccion
+       && en.dodgeCd<=0 && en.stunT<=0 && en.dodgeWindup<=0 && en.dodgeT<=0){
       en.dodgeWindup = en.dodgeWindupMax; en.dodgeCd = 1300;
+      // La direccion la decide de donde viene el tiro — nunca es aleatoria, es
+      // la lectura. Lo que varia un poco es la distancia del salto, para que el
+      // rival no quede en una posicion fija y predecible tras esquivar.
       en.dodgeVx = (amenaza.x > en.x ? -1 : 1) * (0.35 + Math.random()*0.2);
       beep(520, 0.06, 'square', 0.05);      // cue de audio del tell
     }
@@ -2386,7 +2405,7 @@
       '<h2>Cómo jugar</h2>'
       +'<p>Arrastra para apuntar y <b>soltá</b> para disparar. Podés interceptar los escupitajos del rival. La barra de arriba del selector carga tu <b>habilidad definitiva</b> con cada acierto.</p>'
       +'<p style="text-align:left;font-size:12px;color:#ffc371;"><b>⚡ Potencia de tiro</b><br>Cuanto más lejos arrastres, más potente es el disparo: más daño y el efecto elemental <b>garantizado</b> a carga máxima (marca MÁX). Pero la recarga se alarga. Espamear tiros flojos o comprometerse a uno pesado es la decisión central.</p>'
-      +'<p style="text-align:left;font-size:12px;color:#ff8a6a;"><b>🎯 Esquiva telegrafiada</b><br>El rival <b>avisa</b> antes de esquivar: se agacha y aparece un anillo naranja que se cierra. Durante esa ventana está quieto — si le acertás, la esquiva se <b>CANCELA</b> (¡INTERRUMPIDO!) y queda aturdido. Un tiro <b>pesado</b> llega antes de que complete la esquiva; uno flojo llega tarde y ya se movió. Más carga = más fiable contra la evasión.</p>'
+      +'<p style="text-align:left;font-size:12px;color:#ff8a6a;"><b>🎯 Esquiva telegrafiada</b><br>El rival <b>avisa</b> antes de esquivar: se agacha y aparece un anillo naranja que se cierra. Durante esa ventana está quieto — si le acertás, la esquiva se <b>CANCELA</b> (¡INTERRUMPIDO!) y queda aturdido. <b>No esquiva al azar:</b> lo que crece con el nivel es a qué distancia ve venir el tiro, así que el anillo aparece más temprano y cuesta más cortarlo. Un tiro <b>pesado</b> llega antes de que complete la esquiva; uno flojo llega tarde y ya se movió. Más carga = más fiable contra la evasión.</p>'
       +'<p style="text-align:left;font-size:12px;color:#c9a86a;"><b>🪨 Rocas que caen</b><br>El techo suelta rocas. Antes de caer se marcan con un triángulo que tiembla sobre la columna: <b>leé por dónde va a caer</b> y elegí. Una roca en el camino <b>consume tu tiro</b> (se rompe a los pocos golpes), y si cae por tu columna <b>te golpea</b>. Cambiá de columna, apurá el tiro, o rompela antes de que caiga.</p>'
       +'<p style="text-align:left;font-size:12px;color:#7fd4ff;"><b>🛡️ Enemigos con comportamiento</b><br>No todos son iguales, y cada uno te obliga a responder distinto:<br>· <b>Escudado</b> (nivel 4+): levanta un escudo que <b>absorbe tu tiro</b>. El anillo cian se cierra antes de subir: esperá a que baje, cambiá de elemento, o gastá el tiro a propósito.<br>· <b>Saltarín</b> (nivel 7+): se agacha y <b>salta</b>. Leé la altura antes de tirar.<br>· <b>Frenético</b> (todos los jefes): al bajar de la mitad de la vida <b>se enfurece</b> — aura roja, se mueve más rápido y ataca más seguido. Bajalo de golpe o bancate la andanada.</p>'
       +'<p style="text-align:left;font-size:12px;color:#b9a6e8;"><b>🎨 La habilidad de su elemento</b><br>Cada villano usa contra vos <b>la habilidad de SU elemento</b>, igual que tus babosas. El anillo de carga se pinta del color del elemento, así que <b>leés cuál viene</b> antes de que salga:<br>· <b>🔥 Fuego</b>: charco ardiente bajo tus pies que te quema<br>· <b>💧 Agua</b>: marea que te alarga la recarga<br>· <b>🪨 Tierra</b>: te aturde — no disparás, pero conservás la carga<br>· <b>🌪️ Aire</b>: abanico de 3 tiros perforantes<br>· <b>❄️ Hielo</b>: te congela — no disparás <b>y te baja la carga</b><br>· <b>⚡ Rayo</b>: descarga doble, el primero avisa el segundo<br>· <b>🌿 Planta</b>: se regenera y te enreda<br>· <b>🌑 Sombra</b>: te roba vida y se cura con ella</p>'

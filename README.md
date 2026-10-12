@@ -51,24 +51,45 @@ El rival **no se teletransporta al esquivar**. Antes de moverse se agacha `200 m
 **avisa con un anillo naranja** que se va cerrando, acompañado de un pitido. Durante
 esa ventana está quieto y vulnerable.
 
-| Qué hacés | Qué pasa |
-|---|---|
-| Le pegás **durante el anillo** | La esquiva se **cancela**: el tiro pega, el rival queda **aturdido 420 ms**, y ganás `+15` puntos y `+5` de ULTI |
-| Disparás flojo y **provocás** el anillo | El rival gasta su esquiva; cuando el anillo cierra ya se movió |
-| Esperás a que cierre y disparás después | Perdés la ventana: se movió y el tiro falla |
+Y ahora **no esquiva al azar**. Antes el disparo era un dado
+(`Math.random() < evasion*dt/80`): a veces se movía y a veces no, y no había nada que
+pudiieras preparar. La evasión dejó de ser *probabilidad* y pasó a ser **a qué
+distancia ve venir el tiro**:
 
-Por eso la potencia importa también contra la evasión. El rival detecta la amenaza a
-`160 px`, y el proyectil tarda en cubrir esa distancia:
+| Evasión | Radio en el que ve el tiro | Cuándo empieza a esquivar de verdad |
+|---|---|---|
+| 0 (niveles 1-2) | — | Nunca: todavía no tiene con qué |
+| 0.12 (nivel 4) | 94 px | Solo si tirás muy flojo |
+| 0.24 (nivel 6) | 118 px | La potencia mínima ya no alcanza |
+| 0.42 (nivel 9+) | 154 px | Casi siempre |
+| 0.50 (jefe) | 170 px | Siempre que no cargues |
+
+Con la **misma amenaza y el mismo estado, reacciona siempre igual**. Eso es lo que lo
+vuelve legible: podés contar el anillo. Y la potencia sigue siendo la respuesta.
+
+|| Qué hacés | Qué pasa |
+|---|---|
+|| Le pegás **durante el anillo** | La esquiva se **cancela**: el tiro pega, el rival queda **aturdido 420 ms**, y ganás `+15` puntos y `+5` de ULTI |
+|| Disparás flojo y **provocás** el anillo | El rival gasta su esquiva; cuando el anillo cierra ya se movió |
+|| Esperás a que cierre y disparás después | Perdés la ventana: se movió y el tiro falla |
+
+La tabla de abajo está calculada contra el **jefe**, el peor caso (radio de 170 px).
+Contra rivales de niveles menores el tell aparece más tarde y todo se vuelve más
+fácil:
 
 | Potencia | Llega en | Resultado |
 |---|---|---|
-| 1.60 (máxima) | ~182 ms | **Interrumpe** durante el viento, con el rival quieto |
-| 1.20 | ~302 ms | Llega mientras el rival se mueve: corta la esquiva |
-| 0.90 | ~480 ms | Tarde: el anillo ya cerró y se movió |
-| 0.68 | ~662 ms | Tarde |
+| 1.60 (máxima) | ~194 ms | **Interrumpe** durante el viento, con el rival quieto |
+| 1.40 | ~223 ms | Llega mientras el rival se mueve: corta la esquiva |
+| 1.20 | ~263 ms | Corta la esquiva |
+| 0.90 | ~364 ms | Corta la esquiva |
+| 0.76 | ~446 ms | Tarde: el anillo ya cerró y se movió |
+| 0.68 | ~516 ms | Tarde |
 
-Más carga = más fiable contra la evasión. La potencia decide **cuánto gastás** y
-**cuándo llegás**: dos decisiones con el mismo gatillo.
+A potencia máxima el tiro llega en `194 ms` contra los `200 ms` del tell: **interrumpe
+en todos los niveles**, incluso contra el jefe. Más carga = más fiable contra la
+evasión. La potencia decide **cuánto gastás** y **cuándo llegás**: dos decisiones con
+el mismo gatillo.
 
 ### El bug que había: el tell nunca aparecía
 
@@ -207,23 +228,30 @@ node test-potencia.cjs
 # 2. El tradeoff carga-vs-evasion, por CALCULO con las constantes reales del archivo
 node test-esquiva-balance.cjs
 
-# 3-6. Obstaculos (rocas), contra el juego real via harness.cjs
+# 3. La esquiva es DETERMINISTA: misma amenaza -> misma reaccion, sin azar
+node test-esquiva-determinista.cjs
+
+# 4-7. Obstaculos (rocas), contra el juego real via harness.cjs
 node test-obstaculos.cjs              # la roca bloquea el tiro y recibe el dano
 node test-obstaculos-caida.cjs        # la roca cae, acelera y se deshace en el piso
 node test-obstaculos-spawn.cjs        # aparecen solas y telegrafiadas antes de caer
 node test-obstaculos-amenaza.cjs      # la roca golpea al jugador solo en su columna
 
-# 7. Juego real en Edge headless: mide la fisica por pixels y ejercita los controles
+# 8. Juego real en Edge headless: mide la fisica por pixels y ejercita los controles
 "C:/Users/USUARIO/AppData/Local/Programs/Python/Python312/python.exe" qa-juego.py
 
-# 8. La esquiva telegrafiada EN JUEGO: control sin evasion, el tell visible como anillo
+# 9. La esquiva telegrafiada EN JUEGO: control sin evasion, el tell visible como anillo
 "C:/Users/USUARIO/AppData/Local/Programs/Python/Python312/python.exe" test-esquiva.py
 
-# 9. Las rocas EN JUEGO: que el tell y la roca se VEAN (delta contra la linea base)
+# 10. La esquiva EN JUEGO: el tell se dibuja y la esquiva COMPLETA de verdad
+#     (instrumenta ctx.ellipse y ctx.fillText en Edge; caza "¡Esquivó!")
+"C:/Users/USUARIO/AppData/Local/Programs/Python/Python312/python.exe" test-esquiva-browser.py
+
+# 11. Las rocas EN JUEGO: que el tell y la roca se VEAN (delta contra la linea base)
 "C:/Users/USUARIO/AppData/Local/Programs/Python/Python312/python.exe" test-obstaculos-visual.py
 
-# 10-15. Arquetipos: absorcion del escudo, su ciclo telegrafiado, el salto, la
-#        furia, la asignacion por nivel y LO QUE SE DIBUJA de cada uno
+# 12-17. Arquetipos: absorcion del escudo, su ciclo telegrafiado, el salto, la
+#         furia, la asignacion por nivel y LO QUE SE DIBUJA de cada uno
 node test-arquetipo-escudado.cjs
 node test-arquetipo-escudado-ciclo.cjs
 node test-arquetipo-saltarin.cjs
@@ -231,11 +259,11 @@ node test-arquetipo-frenetico.cjs
 node test-arquetipos-asignacion.cjs
 node test-arquetipos-visual.cjs
 
-# 16. End-to-end en Edge real: el juego corre sin errores y la furia se ve jugando
+# 18. End-to-end en Edge real: el juego corre sin errores y la furia se ve jugando
 "C:/Users/USUARIO/AppData/Local/Programs/Python/Python312/python.exe" test-arquetipos-browser.py
 
-# 17-22. Habilidades elementales del villano: que las 8 se activen solas y
-#        avisadas, que SE SIENTAN sobre el jugador, y que se vean
+# 19-22. Habilidades elementales del villano: que las 8 se activen solas y
+#         avisadas, que SE SIENTAN sobre el jugador, y que se vean
 node test-habilidades.cjs
 node test-habilidades-efectos.cjs
 node test-habilidades-visual.cjs
@@ -243,25 +271,25 @@ node test-habilidades-visual.cjs
 # 23. End-to-end en Edge real: salen solas jugando y se ven por su color
 "C:/Users/USUARIO/AppData/Local/Programs/Python/Python312/python.exe" test-habilidades-browser.py
 
-# 24-25. Mini historia: datos del arco y el flujo completo con clics simulados
-#         (victoria -> historia -> siguiente nivel, y repetir NO muestra historia)
+# 24. Mini historia: datos del arco y el flujo completo con clics simulados
+#     (victoria -> historia -> siguiente nivel, y repetir NO muestra historia)
 node test-historia.cjs
 
-# 26. End-to-end en Edge real: GANAR de verdad el nivel 1 y leer la historia
+# 25. End-to-end en Edge real: GANAR de verdad el nivel 1 y leer la historia
 "C:/Users/USUARIO/AppData/Local/Programs/Python/Python312/python.exe" test-historia-browser.py
 
-# 27. El juego YA PUBLICADO, cargado desde la URL de produccion
+# 26. El juego YA PUBLICADO, cargado desde la URL de produccion
 "C:/Users/USUARIO/AppData/Local/Programs/Python/Python312/python.exe" qa-live.py
 ```
 
-La suite 15 no cuenta píxeles: usa el modo de grabación del harness
+La suite 16 no cuenta píxeles: usa el modo de grabación del harness
 (`buildGame({ recordDraw: true })`), que anota el estilo vigente en cada
-`stroke()`/`fill()`. Era la única forma honesta de verificar el dibujo, porque el
-escudo cian `(127,212,255)` y el proyectil de hielo `#6fd6e6` son casi el mismo
+`stroke()`/`fill()`/`fillText()`. Era la única forma honesta de verificar el dibujo,
+porque el escudo cian `(127,212,255)` y el proyectil de hielo `#6fd6e6` son casi el mismo
 tono: un conteo por color habría dado un falso positivo permanente.
 
-Las suites 3-6, 10-15, 17-22 y 24 se escribieron **primero que el código** (TDD): cada una se
-vio fallar por el motivo correcto antes de implementar. La 9 mide el **delta**
+Las suites 4-7, 12-17, 19-22 y 24 se escribieron **primero que el código** (TDD): cada
+una se vio fallar por el motivo correcto antes de implementar. La 11 mide el **delta**
 contra la línea base porque la cornisa y el fondo ya son marrones y suman píxeles
 aunque no haya ninguna roca: medir absolutos habría dado un falso positivo.
 
@@ -271,26 +299,40 @@ canvas se congela en pausa (0 px cambiados) y que el medidor de potencia aparece
 apuntar (0 → 1082 px brillantes) sin ensuciar la pantalla en reposo.
 
 La suite 3 resuelve la cadena de tiempos que sostiene la esquiva con las constantes
-sacadas del propio `index.html` (detección a `160 px`, viento `200 ms`, esquiva
-`220 ms`): a potencia máxima el proyectil llega en `182 ms` e interrumpe el viento
-con el rival quieto; a mínima llega en `662 ms`, cuando la esquiva ya completó. Si la
-curva se invirtiera, el tradeoff sería al revés y la mecánica no significaría nada.
+sacadas del propio `index.html` (radio `70 + evasion*200`, viento `200 ms`, esquiva
+`220 ms`). Se calcula contra el **jefe**, el peor caso: a potencia máxima el proyectil
+llega en `194 ms` e interrumpe el viento con el rival quieto; a `0.68` llega en
+`516 ms`, cuando la esquiva ya completó. Si la curva se invirtiera, el tradeoff sería
+al revés y la mecánica no significaría nada.
 
-La suite 4 corre el juego de verdad: un **control en nivel 1** (evasión negativa,
+La suite 4 es la que cierra el issue del azar: con la misma amenaza y el mismo estado
+el rival reacciona **60 de 60 veces** (antes eran 5 de 60). Verifica además que la
+misma amenaza reacciona según la evasión, que con evasión 0 no reacciona (niveles 1-2
+intactos), que el tell aparece, y que el cooldown deja una ventana para tirar.
+
+La suite 10 es la que ve la mecánica de verdad: instrumenta `ctx.ellipse` y
+`ctx.fillText` en Edge para contar los cuadros en que el anillo naranja se dibuja, y
+caza la partícula `¡Esquivó!` — que solo sale cuando la esquiva **completó**. Dos
+trampas que hicieron perder tiempo: el trazo sale como `rgba(255, 120, 90, 0.35)`
+**con espacios**, así que comparar contra `255,120,90` a secas no matchea nunca; y la
+etiqueta del HUD también dice "esquiva", así que hay que filtrar por altura para no
+contar el HUD en vez de las esquivas.
+
+La suite 9 corre el juego de verdad: un **control en nivel 1** (evasión negativa,
 el rival nunca esquiva) para confirmar que el apuntado y la medición funcionan, y
 después verifica que el anillo del tell aparece como **anillo** (extensión
 horizontal ≥ 40 px, no la estela vertical del proyectil).
 
-**Qué esta suite NO puede medir, y por qué.** La tasa de acierto por potencia
-queda invalidada por dos propiedades del propio juego: `powerFromDrag` satura en
-`1.60` para cualquier objetivo lejano (las cuatro potencias producen el mismo
-tiro), y el rival camina a `0.049 px/ms` en nivel 6, así que deriva `27–61 px`
-mientras el proyectil viaja — justo por encima del margen de colisión (`±38.6 px`).
-Un test que dispara a la posición leída hace rato mide **deriva**, no evasión. El
-tradeoff queda cubierto por el cálculo de la suite 2, que usa las constantes
-reales; la suite conductual cubre el tell.
+**Qué esa suite NO puede medir, y por qué.** La tasa de acierto por potencia queda
+invalidada por dos propiedades del propio juego: `powerFromDrag` satura en `1.60`
+para cualquier objetivo lejano (las cuatro potencias producen el mismo tiro), y el
+rival camina a `0.049 px/ms` en nivel 6, así que deriva `27–61 px` mientras el
+proyectil viaja — justo por encima del margen de colisión (`±38.6 px`). Un test que
+dispara a la posición leída hace rato mide **deriva**, no evasión. Por eso el
+tradeoff se cubre con el cálculo de la suite 2 (constantes reales) y el
+comportamiento con las suites 4 y 10.
 
-La suite 5 corre lo mismo contra `https://traderxael.github.io/slug-out-/`: arranca el
-nivel, dispara 3 pares de tiros con nivel reiniciado entre cada uno (así ningún
+La suite 26 corre lo mismo contra `https://traderxael.github.io/slug-out-/`: arranca
+el nivel, dispara 3 pares de tiros con nivel reiniciado entre cada uno (así ningún
 escupitajo del rival baja por la banda de medición) y comprueba que el cargado sube
 más alto en las 3 repeticiones (21 / 28 / 27 px).
