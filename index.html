@@ -565,7 +565,8 @@
       rafaga:o.rafaga||1, burstLeft:0, burstTimer:0,
       burnTicks:0, burnDamage:0, burnTimer:0, slowLeft:0, freezeLeft:0,
       cycles:o.boss, cycleTimer:0, phase:0, hitT:0,
-      dodgeCd:0, dodgeT:0, dodgeVx:0, evasion:o.evasion||0
+      dodgeCd:0, dodgeT:0, dodgeWindup:0, dodgeWindupMax:200, dodgeVx:0,
+      stunT:0, evasion:o.evasion||0
     };
   }
   function statsNivel(L){
@@ -875,23 +876,44 @@
     }
     en.phase += dt*0.007;
 
-    // ======== IA de esquiva (NUEVO) ========
+    // ======== IA de esquiva TELEGRAFIADA (NUEVO) ========
+    // El rival NO esquiva al instante: se agacha 200ms y AVISA. Durante esa
+    // ventana está quieto, y si le acertás la esquiva se CANCELA y queda
+    // aturdido. Esto convierte el azar en lectura, y crea el ida y vuelta:
+    // mirar el tell y castigar, o provocarlo con un tiro flojo.
+    //
+    // Balance: el rival detecta la amenaza a 160px. A potencia máxima el
+    // proyectil tarda ~178ms en llegar, así que INTERRUMPE. A potencia media
+    // (~286ms) corta el movimiento de esquiva. A potencia mínima (~516ms)
+    // llega tarde y ya se movió. Más carga = más fiable contra la evasión.
     if(en.dodgeCd>0) en.dodgeCd -= dt;
-    if(en.dodgeT>0){ en.dodgeT -= dt; en.x += en.dodgeVx*dt; }
+    if(en.stunT>0) en.stunT = Math.max(0, en.stunT-dt);
+    if(en.dodgeWindup>0){
+      en.dodgeWindup -= dt;
+      if(en.dodgeWindup<=0){ en.dodgeT = 220; addTextParticle(en.x, en.y-en.r-24, '¡Esquivó!', UI.dim, 10); }
+    } else if(en.dodgeT>0){
+      en.dodgeT -= dt; en.x += en.dodgeVx*dt;
+    }
     let amenaza = null, closer = 1e9;
     for(const p of state.projectiles){
-      if(p.vy<=0) continue;
+      // Solo cuenta lo que SUBE hacia el rival. Con `vy<=0` se descartaba
+      // justo el tiro entrante, y con `dy = en.y - p.y` la distancia daba
+      // negativa mientras el proyectil se acercaba: el rival solo reaccionaba
+      // a un tiro que ya habia pasado de largo y caia, asi que el tell NUNCA
+      // aparecia en juego normal y la mecanica quedaba muerta.
+      if(p.vy>=0) continue;
       const dx = Math.abs(p.x - en.x);
-      const dy = en.y - p.y;
+      const dy = p.y - en.y;          // positivo = el proyectil esta DEBAJO, acercandose
       if(dy>0 && dy<160 && dx<50 && dx/dy < 0.6){
         const d = dy;
         if(d<closer){ closer = d; amenaza = p; }
       }
     }
-    if(amenaza && en.dodgeCd<=0 && Math.random()<en.evasion*dt/80){
-      en.dodgeT = 220; en.dodgeCd = 1300;
+    if(amenaza && en.dodgeCd<=0 && en.stunT<=0 && en.dodgeWindup<=0 && en.dodgeT<=0
+       && Math.random()<en.evasion*dt/80){
+      en.dodgeWindup = en.dodgeWindupMax; en.dodgeCd = 1300;
       en.dodgeVx = (amenaza.x > en.x ? -1 : 1) * (0.35 + Math.random()*0.2);
-      addTextParticle(en.x, en.y-en.r-24, '¡Esquivó!', UI.dim, 10);
+      beep(520, 0.06, 'square', 0.05);      // cue de audio del tell
     }
 
     for(let i=state.projectiles.length-1;i>=0;i--){
@@ -933,6 +955,18 @@
       const dx=p.x-en.x, dy=p.y-en.y;
       const nx=dx/(en.r*1.4+5), ny=dy/(en.r*0.95+5);
       if(nx*nx+ny*ny<1){
+        // Acertar durante el "viento" o el movimiento de esquiva lo CANCELA:
+        // el tiro pega (en vez de fallar) y el rival queda aturdido. Este es el
+        // castigo que convierte el azar en lectura.
+        const interrumpido = en.dodgeWindup>0 || en.dodgeT>0;
+        if(interrumpido){
+          en.dodgeWindup = 0; en.dodgeT = 0; en.dodgeCd = 1900; en.stunT = 420;
+          addTextParticle(en.x, en.y-en.r-32, '¡INTERRUMPIDO!', '#ffc371', 12);
+          addParticles(en.x, en.y-en.r*0.5, '#ffc371', 10, 'rayo');
+          state.ultiCharge = Math.min(state.ultiMax, state.ultiCharge + 5);
+          state.score += 15;
+          beep(880, 0.09, 'square', 0.09);
+        }
         applyHit(p.el, Math.sqrt(dx*dx+dy*dy)<12, p.r, p.power);
         state.projectiles.splice(i,1);
       }
@@ -942,7 +976,9 @@
     if(congelado){
       en.freezeLeft = Math.max(0, en.freezeLeft-dt);
     } else {
-      if(en.dodgeT<=0) en.x += en.vx*en.dir*dt;
+      // Durante el "viento" de la esquiva el rival se QUEDA QUIETO: el tell
+      // tiene que ser legible y la ventana de castigo, justa.
+      if(en.dodgeT<=0 && en.dodgeWindup<=0 && en.stunT<=0) en.x += en.vx*en.dir*dt;
       if(en.x<50){ en.x=50; en.dir=1; if(en.dodgeT>0) en.dodgeVx = Math.abs(en.dodgeVx); }
       if(en.x>W-50){ en.x=W-50; en.dir=-1; if(en.dodgeT>0) en.dodgeVx = -Math.abs(en.dodgeVx); }
     }
@@ -1029,6 +1065,7 @@
     if(alpha<=0) return;
     const und = en.freezeLeft>0 ? 0 : Math.sin(en.phase)*0.04;
     const hit = en.hitT>0 ? en.hitT/140 : 0;
+    const windup = en.dodgeWindup>0 ? 1-en.dodgeWindup/en.dodgeWindupMax : 0;
     let sx = (1+und)*(1+0.14*hit), sy = (1-und)*(1-0.12*hit);
     if(dead){ sx *= 1+0.35*tt; sy *= 1-0.65*tt; }
     let tint = null;
@@ -1041,8 +1078,26 @@
     ctx.translate(en.x, LEDGE_Y+1);
     ctx.scale(en.dir*sx, sy);
     ctx.translate(0, -0.78*en.r);
-    drawSlugBody(ctx, en.r, en.tipo, {alpha:alpha, flash:hit*0.75, tint:tint});
+    drawSlugBody(ctx, en.r, en.tipo, {alpha:alpha, flash:hit*0.75 + windup*0.5, tint:tint});
     ctx.restore();
+    // TELL de esquiva: anillo que se CIERRA. Cuando llega a cero, arranca el
+    // movimiento; si le acertás antes, se cancela. Rojo = se acaba la ventana.
+    if(!dead && en.dodgeWindup>0){
+      const rad = en.r*1.5 + 6 + (1-windup)*30;
+      ctx.save();
+      ctx.lineWidth = 2.5;
+      ctx.strokeStyle = 'rgba(255,120,90,'+(0.35+0.55*windup)+')';
+      ctx.beginPath(); ctx.ellipse(en.x, en.y-6, rad, en.r+8+(1-windup)*10, 0, 0, Math.PI*2); ctx.stroke();
+      ctx.restore();
+    }
+    if(!dead && en.stunT>0){
+      // aturdido: estrellas girando sobre la cabeza
+      const a = en.stunT/60;
+      ctx.save(); ctx.fillStyle = '#ffc371'; ctx.font = '11px sans-serif'; ctx.textAlign = 'center';
+      ctx.fillText('✦', en.x-9, en.y-en.r-12+Math.sin(a)*3);
+      ctx.fillText('✦', en.x+9, en.y-en.r-16+Math.cos(a)*3);
+      ctx.restore();
+    }
     if(dead) return;
     const interval = en.atkInterval*(en.slowLeft>0?1.6:1);
     const pct = Math.min(1, en.atkTimer/interval);
@@ -1789,10 +1844,11 @@
       '<h2>Cómo jugar</h2>'
       +'<p>Arrastra para apuntar y <b>soltá</b> para disparar. Podés interceptar los escupitajos del rival. La barra de arriba del selector carga tu <b>habilidad definitiva</b> con cada acierto.</p>'
       +'<p style="text-align:left;font-size:12px;color:#ffc371;"><b>⚡ Potencia de tiro</b><br>Cuanto más lejos arrastres, más potente es el disparo: más daño y el efecto elemental <b>garantizado</b> a carga máxima (marca MÁX). Pero la recarga se alarga. Espamear tiros flojos o comprometerse a uno pesado es la decisión central.</p>'
+      +'<p style="text-align:left;font-size:12px;color:#ff8a6a;"><b>🎯 Esquiva telegrafiada</b><br>El rival <b>avisa</b> antes de esquivar: se agacha y aparece un anillo naranja que se cierra. Durante esa ventana está quieto — si le acertás, la esquiva se <b>CANCELA</b> (¡INTERRUMPIDO!) y queda aturdido. Un tiro <b>pesado</b> llega antes de que complete la esquiva; uno flojo llega tarde y ya se movió. Más carga = más fiable contra la evasión.</p>'
       +'<p style="text-align:left;font-size:12px;color:#6ad4ff;"><b>Teclado (PC)</b><br>← → apuntar · ↑ ↓ potencia · Espacio disparar · 1-8 elemento · U ULTI · P pausa · M sonido · R reiniciar</p>'
       +'<p style="text-align:left;font-size:11px;">'+ventajas+'</p>'
       +'<p style="text-align:left;font-size:11px;">'+habil+'</p>'
-      +'<p>Cada nivel termina con un Guardián. Ganás gemas y cofres. Los enemigos pueden <b>esquivar</b>: la probabilidad sube con el nivel. El <b>combo</b> caduca a los 5 segundos sin acertar.</p>'
+      +'<p>Cada nivel termina con un Guardián. Ganás gemas y cofres. Los enemigos pueden <b>esquivar</b>: <b>avisan</b> antes con un anillo naranja, y si les acertás en esa ventana la esquiva se cancela. El <b>combo</b> caduca a los 5 segundos sin acertar.</p>'
       +'<button class="btn btnAlt" id="btnVolver">Volver</button>'
     );
     bind('btnVolver', renderMenu);
