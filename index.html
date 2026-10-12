@@ -130,7 +130,18 @@
     {nombre:'Sala ardiente',       n:6, pool:ELKEYS,                                  cofre:'hierro'},
     {nombre:'Laberinto de cristal',n:6, pool:ELKEYS,                                  cofre:'hierro'},
     {nombre:'Abismo eléctrico',    n:6, pool:ELKEYS,                                  cofre:'dorado'},
-    {nombre:'Corazón de la cueva', n:7, pool:ELKEYS,                                  cofre:'dorado'}
+    {nombre:'Corazón de la cueva', n:7, pool:ELKEYS,                                  cofre:'dorado'},
+    // ---- el despues: la cueva quedo viva y hay que vivir en ella ----
+    // El arco no termina en el 12: el 12 era la verdad, y la verdad no cierra
+    // nada. Estos ocho son las consecuencias.
+    {nombre:'La cueva despierta',  n:7, pool:ELKEYS,                                  cofre:'dorado'},
+    {nombre:'Ocho colores, un pozo',n:7,pool:ELKEYS,                                  cofre:'dorado'},
+    {nombre:'Alguien más baja',    n:7, pool:ELKEYS,                                  cofre:'cristal'},
+    {nombre:'El que no es guardián',n:7,pool:ELKEYS,                                  cofre:'cristal'},
+    {nombre:'Dos sedientos',       n:7, pool:ELKEYS,                                  cofre:'cristal'},
+    {nombre:'El rey es la piedra', n:8, pool:ELKEYS,                                  cofre:'cristal'},
+    {nombre:'Volver a sellar',     n:8, pool:ELKEYS,                                  cofre:'cristal'},
+    {nombre:'Lo que queda',        n:8, pool:ELKEYS,                                  cofre:'mitico'}
   ];
   const FREQS = {fuego:330, agua:392, tierra:262, aire:494, hielo:440, rayo:587, planta:349, sombra:233};
 
@@ -163,7 +174,27 @@
     11:{titulo:'La corriente que viene de abajo',
         texto:'El rayo no cae del cielo. Sube. Algo abajo lo empuja, y ese algo tiene prisa.'},
     12:{titulo:'La verdad',
-        texto:'En el corazón de la cueva no hay un monstruo. Hay un rey que selló los ocho elementos para que nadie los peleara nunca más. Yo traigo ocho, y él tiene razón: cada uno que libero enciende una guerra. Pero la cueva ya está muerta, y una cueva viva vale más que una cueva en paz.'}
+        texto:'En el corazón de la cueva no hay un monstruo. Hay un rey que selló los ocho elementos para que nadie los peleara nunca más. Yo traigo ocho, y él tiene razón: cada uno que libero enciende una guerra. Pero la cueva ya está muerta, y una cueva viva vale más que una cueva en paz.'},
+    // ---- el despues: la ruta sigue ----
+    // Liberar los elementos no arregló nada: los dejó sueltos. Estos ocho
+    // fragmentos son las consecuencias, y el arco cierra distinto a como
+    // empezó (el rey sellaba por miedo; el protagonista elige abrir).
+    13:{titulo:'Despertar',
+        texto:'La cueva respira. No es un consuelo: respirar es querer algo, y lo que quiere no soy yo.'},
+    14:{titulo:'No caben ocho',
+        texto:'Los elementos libres no saben compartir. El agua discute con el fuego, el rayo con la sombra, y yo estoy en el medio sin poder poner orden.'},
+    15:{titulo:'Pasos que no son míos',
+        texto:'Alguien bajó detrás de mí. Los oí en el cristal: lentos, cuidadosos, de alguien que no quiere romper nada.'},
+    16:{titulo:'El que no es guardián',
+        texto:'No trae elemento. Cargó el suyo hace años y se le acabó. Me mira como se mira a alguien que va a morir y todavía no lo sabe.'},
+    17:{titulo:'Un odre para dos',
+        texto:'Queda agua para uno. Si la reparto llegamos los dos flojos; si me la quedo, llego yo. Es la cuenta más difícil de la cueva.'},
+    18:{titulo:'El rey no murió',
+        texto:'El rey no era un hombre: era la cueva queriendo descansar. Selló los ocho elementos para dejar de sentir, y al abrirlos le devolví el dolor.'},
+    19:{titulo:'El sello, otra vez',
+        texto:'Puedo volver a sellar. Ocho elementos quietos, una cueva en paz, y nadie peleando nunca más. Es justo lo que el rey quería, y ahora entiendo por qué.'},
+    20:{titulo:'Lo que queda',
+        texto:'No sellé nada. Dejé los ocho en manos de dos que todavía no saben usarlos, y bajé. La cueva va a doler un rato largo. También va a volver a cantar, y eso no lo había oído nadie en años.'}
   };
 
   const SELECTOR_Y = 490, SELECTOR_H = 70;
@@ -282,7 +313,11 @@
     {id:'ola_10',           nombre:'Ola 10',            desc:'Llegá a la ola 10 en infinito', gemas:40,  check:s=>s.mejorOla>=10},
     {id:'ola_25',           nombre:'Ola 25',            desc:'Llegá a la ola 25 en infinito', gemas:100, check:s=>s.mejorOla>=25},
     {id:'nivel_5',          nombre:'Nivel 5',           desc:'Llegá al nivel 5',              gemas:30,  check:s=>s.nivel>=5},
-    {id:'nivel_12',         nombre:'¡Completaste el juego!',desc:'Llegá al nivel 12',        gemas:150, check:s=>s.nivel>=12},
+    // El id se MANTIENE a proposito: cambiar el id haria perder el logro a los
+    // que ya lo ganaron. Lo que cambia es el nombre, porque con 20 niveles el 12
+    // ya no es el final: es donde se entera de la verdad.
+    {id:'nivel_12',         nombre:'¡La verdad!',       desc:'Llegá al nivel 12',        gemas:150, check:s=>s.nivel>=12},
+    {id:'nivel_20',         nombre:'¡Completaste la cueva!',desc:'Llegá al nivel 20',     gemas:400, check:s=>s.nivel>=20},
     {id:'racha_3',         nombre:'3 días seguidos',   desc:'Jugá 3 días seguidos',          gemas:50,  check:s=>s.racha.dias>=3},
     {id:'racha_7',         nombre:'7 días seguidos',   desc:'Jugá 7 días seguidos',          gemas:150, check:s=>s.racha.dias>=7},
     {id:'combo_30',        nombre:'Combo x30',         desc:'Hacé un combo de 30',           gemas:90,  check:s=>s.stats.combos>=30},
@@ -652,6 +687,45 @@
     bind('btnSaltarHist', ()=>{ hideOverlay(); continuar(); });
     bind('btnSeguirHist',  ()=>{ hideOverlay(); continuar(); });
   }
+  // ---------- la ruta de historia ----------
+  // Los fragmentos se leen de a uno entre combates. Aca se pueden volver a leer
+  // en orden, que es la unica forma de que el arco se entienda como viaje y no
+  // como 20 textos sueltos. Se muestra lo ya VIVIDO: si ganaste un nivel, ya
+  // viste su fragmento, asi que se usa save.estrellas como marca (no hay que
+  // guardar nada mas). Lo no jugado aparece tapado, para que se vea lo que falta
+  // sin adelantar nada.
+  // Cuantos fragmentos ya se vivieron. Un nivel ganado = su fragmento ya visto.
+  function histVistas(){
+    let n = 0;
+    Object.keys(HISTORIA).forEach(L=>{ if(save.estrellas[L] > 0) n++; });
+    return n;
+  }
+  function renderHistoria(){
+    detenerJuego();
+    let items = '';
+    let vistas = 0;
+    Object.keys(HISTORIA).map(Number).sort((a,b)=>a-b).forEach(L=>{
+      const h = HISTORIA[L], nv = NIVELES[L-1];
+      const vivo = !!(nv && save.estrellas[L] > 0);
+      if(vivo) vistas++;
+      const col = (nv && nv.pool && nv.pool.length) ? ELEMENT_INFO[nv.pool[0]].color : '#6ad4ff';
+      items += '<div class="histItem" data-hist="'+L+'" style="'+(vivo?'':'opacity:.32;')+'cursor:'+(vivo?'pointer':'default')+'">'
+        + '<div style="color:'+(vivo?col:'#555')+';font-size:10px;letter-spacing:1.5px;">NIVEL '+L+(vivo?'':' · SIN ABRIR')+'</div>'
+        + '<div style="color:'+(vivo?'var(--ink)':'#666')+';font-size:13px;font-weight:600;margin-top:2px;">'+(vivo?h.titulo:'???')+'</div>'
+        + '</div>';
+    });
+    showOverlay('<h2>La ruta de la cueva</h2>'
+      +'<p style="font-size:12px;color:var(--dim)">La historia, fragmento por fragmento · '+vistas+' de '+Object.keys(HISTORIA).length+' vividos · tocá uno para volver a leerlo</p>'
+      +'<div id="histLista" style="display:flex;flex-direction:column;gap:6px;width:100%;max-width:320px;text-align:left;">'+items+'</div>'
+      +'<button class="btn btnAlt" id="btnVolver">Volver</button>');
+    document.querySelectorAll('[data-hist]').forEach(node=>{
+      node.addEventListener('click', ()=>{
+        const L = Number(node.getAttribute('data-hist'));
+        if(save.estrellas[L] > 0) mostrarHistoria(L, renderHistoria);
+      });
+    });
+    bind('btnVolver', renderMenu);
+  }
   function drawHpBar(x,y,w,h,val,max,color){
     ctx.fillStyle = 'rgba(255,255,255,.08)'; ctx.fillRect(x,y,w,h);
     ctx.fillStyle = color; ctx.fillRect(x,y,w*Math.max(0,val/max),h);
@@ -720,7 +794,10 @@
   function statsNivel(L){
     return {
       hpMul: 1+0.40*(L-1), dmgMul: 1+0.19*(L-1), intMul: Math.max(0.5, 1-0.055*(L-1)),
-      spdMul: 1+0.07*(L-1), rafaga: L>=10 ? 3 : (L>=5 ? 2 : 1), evasion: Math.min(0.42, (L-2)*0.06)
+      spdMul: 1+0.07*(L-1), rafaga: L>=15 ? 4 : (L>=10 ? 3 : (L>=5 ? 2 : 1)),
+      // El piso en 0 importa: en los niveles 1 y 2 daba NEGATIVA, y aunque el
+      // codigo de esquiva hacia Math.max(0, ...) el stat quedaba sucio.
+      evasion: Math.min(0.42, Math.max(0, (L-2)*0.06))
     };
   }
   // Asignacion de arquetipo: se introducen por nivel para que el jugador los
@@ -2278,6 +2355,7 @@
       +'<p style="font-size:12px;color:#ffd700;">'+rachaTxt+'</p>'
       +'<button class="btn" id="btnNiveles">Niveles</button>'
     +'<button class="btnAlt" id="btnEquipo">🐌 Equipo · '+equipoActual().length+'/'+EQUIPO_MAX+'</button>'
+    +'<button class="btnAlt" id="btnHistoria">📖 Ruta de la cueva · '+histVistas()+'/'+Object.keys(HISTORIA).length+'</button>'
       +'<button class="btn btnAlt" id="btnInfinito">Modo infinito</button>'
       +'<button class="btn btnAlt" id="btnCofres">Cofres'+(n?' ('+n+')':'')+'</button>'
       +'<button class="btn btnAlt" id="btnColeccion">Colección '+totalBabosas()+'/40</button>'
@@ -2289,6 +2367,7 @@
     );
     bind('btnNiveles', renderNiveles);
     bind('btnEquipo', renderEquipo);
+    bind('btnHistoria', renderHistoria);
     bind('btnInfinito', ()=>iniciar('infinito'));
     bind('btnCofres', renderCofres);
     bind('btnColeccion', renderColeccion);
@@ -2503,7 +2582,7 @@
       +'<p style="text-align:left;font-size:12px;color:#c9a86a;"><b>🪨 Rocas que caen</b><br>El techo suelta rocas. Antes de caer se marcan con un triángulo que tiembla sobre la columna: <b>leé por dónde va a caer</b> y elegí. Una roca en el camino <b>consume tu tiro</b> (se rompe a los pocos golpes), y si cae por tu columna <b>te golpea</b>. Cambiá de columna, apurá el tiro, o rompela antes de que caiga.</p>'
       +'<p style="text-align:left;font-size:12px;color:#7fd4ff;"><b>🛡️ Enemigos con comportamiento</b><br>No todos son iguales, y cada uno te obliga a responder distinto:<br>· <b>Escudado</b> (nivel 4+): levanta un escudo que <b>absorbe tu tiro</b>. El anillo cian se cierra antes de subir: esperá a que baje, cambiá de elemento, o gastá el tiro a propósito.<br>· <b>Saltarín</b> (nivel 7+): se agacha y <b>salta</b>. Leé la altura antes de tirar.<br>· <b>Frenético</b> (todos los jefes): al bajar de la mitad de la vida <b>se enfurece</b> — aura roja, se mueve más rápido y ataca más seguido. Bajalo de golpe o bancate la andanada.</p>'
       +'<p style="text-align:left;font-size:12px;color:#b9a6e8;"><b>🎨 La habilidad de su elemento</b><br>Cada villano usa contra vos <b>la habilidad de SU elemento</b>, igual que tus babosas. El anillo de carga se pinta del color del elemento, así que <b>leés cuál viene</b> antes de que salga:<br>· <b>🔥 Fuego</b>: charco ardiente bajo tus pies que te quema<br>· <b>💧 Agua</b>: marea que te alarga la recarga<br>· <b>🪨 Tierra</b>: te aturde — no disparás, pero conservás la carga<br>· <b>🌪️ Aire</b>: abanico de 3 tiros perforantes<br>· <b>❄️ Hielo</b>: te congela — no disparás <b>y te baja la carga</b><br>· <b>⚡ Rayo</b>: descarga doble, el primero avisa el segundo<br>· <b>🌿 Planta</b>: se regenera y te enreda<br>· <b>🌑 Sombra</b>: te roba vida y se cura con ella</p>'
-      +'<p style="text-align:left;font-size:12px;color:#b9a6e8;"><b>📖 La historia de la campana</b><br>Tras cada combate ganado, un pedazo de historia cuenta qué pasa en la cueva y por qué la estás recorriendo. El arco se lee con los elementos: el fuego que seca, el hielo que conserva, la sombra que drena. Si no te interesa, <b>Saltar</b> y listo.</p>'
+      +'<p style="text-align:left;font-size:12px;color:#b9a6e8;"><b>📖 La historia de la campana</b><br>Tras cada combate ganado, un pedazo de historia cuenta qué pasa en la cueva y por qué la estás recorriendo. El arco se lee con los elementos: el fuego que seca, el hielo que conserva, la sombra que drena. Son <b>20 fragmentos</b>: los 12 primeros son el viaje hasta la verdad, y del 13 al 20 las consecuencias de haber abierto la cueva. Si no te interesa, <b>Saltar</b> y listo. Cuando quieras, en el menú está <b>Ruta de la cueva</b> para volver a leerlos en orden.</p>'
       +'<p style="text-align:left;font-size:12px;color:#8fd68a;"><b>🐌 Tu equipo de combate</b><br>Tenés una mochila con babosas, pero al combate entran <b>solo 3</b>. En el menú, <b>Equipo</b> abre el selector: tocá una babosa de la mochila para meterla, y tocá una del equipo para sacarla. Las marcadas llevan el borde de su color. Cuando el equipo está lleno las demás se apagan: hay que sacar una antes de meter otra. El equipo queda guardado, así que elegís una vez y peleás siempre con esas 3. En combate cambiás entre ellas con el selector de abajo o las teclas <b>1, 2 y 3</b>.</p>'
       +'<p style="text-align:left;font-size:12px;color:#6ad4ff;"><b>Teclado (PC)</b><br>← → apuntar · ↑ ↓ potencia · Espacio disparar · 1-3 elemento · U ULTI · P pausa · M sonido · R reiniciar</p>'
       +'<p style="text-align:left;font-size:11px;">'+ventajas+'</p>'

@@ -179,11 +179,34 @@ está juntando.*
 | 8 · Velo de sombras | **Lo que se lleva la sombra** — la sombra drena, y alguien junta los elementos. |
 | 12 · Corazón de la cueva | **La verdad** — no hay un monstruo: hay un rey que selló los elementos, y tiene razón. |
 
+### La ruta sigue: 13 al 20
+
+El 12 no era el final: era *enterarse*. Liberar los ocho elementos no arregló
+nada — los dejó sueltos — y estos ocho niveles son las consecuencias.
+
+| Nivel | Fragmento |
+|---|---|
+| 13 · La cueva despierta | **Despertar** — "respirar es querer algo, y lo que quiere no soy yo." |
+| 15 · Alguien más baja | **Pasos que no son míos** — alguien bajó detrás, "lentos, cuidadosos". |
+| 17 · Dos sedientos | **Un odre para dos** — el agua alcanza para uno: la cuenta más difícil de la cueva. |
+| 18 · El rey es la piedra | **El rey no murió** — no era un hombre: era la cueva queriendo descansar. |
+| 19 · Volver a sellar | **El sello, otra vez** — puede volver a sellar, y ahora entiende por qué el rey quería. |
+| 20 · Lo que queda | **Lo que queda** — no selló nada: "también va a volver a cantar". |
+
+El arco cierra distinto a como empezó: el rey sellaba **por miedo**, el
+protagonista elige **abrir**.
+
 El fragmento se puede **saltar**; la campana sigue igual. Solo aparece al *avanzar*
 — repetir un nivel o volver a Niveles va directo, porque no estás avanzando el viaje.
 
 Cada fragmento se pinta con el color del elemento del nivel, así que la historia
 se lee con el mismo lenguaje que el combate.
+
+### 📖 Volver a leer la ruta
+
+En el menú, **Ruta de la cueva** lista los 20 fragmentos en orden. Se ven solo los
+ya vividos (un nivel ganado = su fragmento ya visto), y tocar uno lo relee. Lo no
+jugado aparece tapado con `???`, para que se vea lo que falta sin adelantar nada.
 
 ## ⚔️ Elementos
 
@@ -200,7 +223,7 @@ se lee con el mismo lenguaje que el combate.
 
 ## 🏆 Sistemas
 
-- **12 niveles** con Guardianes jefes
+- **20 niveles** con Guardianes jefes
 - **Modo infinito** con dificultad progresiva
 - **Equipo de combate de 3 babosas**: juntás una mochila de hasta 8 elementos, pero
   al combate entran **solo las 3 que elijas**. En el menú, **Equipo** abre el
@@ -209,8 +232,8 @@ se lee con el mismo lenguaje que el combate.
   apagan (hay que sacar una antes de meter otra). La elección queda guardada, así
   que armás el equipo una vez y peleás siempre con esas 3.
 - **5 cofres**: madera, hierro, dorado, cristal y mítico
-- **25 logros** desbloqueables (incluye *Francotirador* por críticos y *A toda carga*
-  por disparos a carga máxima)
+- **26 logros** desbloqueables (incluye *Francotirador* por críticos, *A toda carga*
+  por disparos a carga máxima y *¡Completaste la cueva!* por llegar al 20)
 - **3 desafíos diarios** con recompensa en gemas
 - **Racha diaria** de días consecutivos jugando
 - **Pausa** con reanudar / reiniciar / silenciar, y pausa automática al cambiar de pestaña
@@ -295,6 +318,15 @@ node test-equipo.cjs
 #     mouse, y que el combate arranque con esas 3 (instrumenta ctx.fillText
 #     para leer los nombres que pinta el selector de abajo)
 "C:/Users/USUARIO/AppData/Local/Programs/Python/Python312/python.exe" test-equipo-browser.py
+
+# 29. La campana de 20 niveles y su ruta de historia: un fragmento por nivel,
+#     el arco que cierra en el ultimo, el balance sano hasta el 20, y el logro
+#     del final apuntando al nivel correcto
+node test-niveles.cjs
+
+# 30. End-to-end en Edge real: abrir la ruta, ver solo lo ya vivido, releer un
+#     fragmento tocandolo, y el selector de niveles llegando a 20
+"C:/Users/USUARIO/AppData/Local/Programs/Python/Python312/python.exe" test-ruta-browser.py
 ```
 
 La suite 16 no cuenta píxeles: usa el modo de grabación del harness
@@ -303,7 +335,7 @@ La suite 16 no cuenta píxeles: usa el modo de grabación del harness
 porque el escudo cian `(127,212,255)` y el proyectil de hielo `#6fd6e6` son casi el mismo
 tono: un conteo por color habría dado un falso positivo permanente.
 
-Las suites 4-7, 12-17, 19-22, 24 y 27 se escribieron **primero que el código**
+Las suites 4-7, 12-17, 19-22, 24, 27 y 29 se escribieron **primero que el código**
 (TDD): cada una se vio fallar por el motivo correcto antes de implementar. La 11
 mide el **delta** contra la línea base porque la cornisa y el fondo ya son marrones
 y suman píxeles aunque no haya ninguna roca: medir absolutos habría dado un falso

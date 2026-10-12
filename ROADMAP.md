@@ -42,14 +42,14 @@ test de Node puede recorrer `victoria → historia → siguiente nivel` completo
 
 ---
 
-## Mapa de `index.html` (~2450 líneas)
+## Mapa de `index.html` (~2640 líneas)
 
 ### Datos y constantes
 | Línea | Qué |
 |---|---|
-| 107 | `NIVELES` — los 12 niveles de campana (nombre, nº de rivales, elementos) |
+| 121 | `NIVELES` — los **20** niveles de campana (nombre, nº de rivales, elementos, cofre) |
 | 121 | `FREQS` — tono de cada elemento |
-| 129 | `HISTORIA` — los 12 fragmentos de la mini historia |
+| 153 | `HISTORIA` — los **20** fragmentos de la mini historia (1-12 el viaje, 13-20 las consecuencias) |
 | ~140 | `ELEMENT_INFO`, `ELKEYS`, `RING` (qué elemento vence a cuál) |
 
 ### Guardado y progresión
@@ -77,6 +77,10 @@ test de Node puede recorrer `victoria → historia → siguiente nivel` completo
 1060 `siguienteEnemigo` · **1075 `update` — la IA completa** ·
 **1136-1141 la esquiva del rival** (radio `70 + evasion*200`, determinista) · 1251 el aturdimiento · 1264-1273 movimiento y límites
 
+### Historia
+670 `histVistas` · **703 `mostrarHistoria` (el fragmento entre combates)** ·
+**733 `renderHistoria` (la ruta: los 20 en orden, solo lo vivido)**
+
 ### Obstáculos
 874 `danoDeRoca` · 882 `intervaloRoca` · 890 `spawnRoca` · 1827 `drawRocas`
 
@@ -97,7 +101,7 @@ test de Node puede recorrer `victoria → historia → siguiente nivel` completo
 
 ## Recetas
 
-**Añadir un nivel de campana** → `NIVELES` (107) + un fragmento en `HISTORIA` (129).
+**Añadir un nivel de campana** → `NIVELES` (121) + un fragmento en `HISTORIA` (153). `test-niveles.cjs` exige que haya **exactamente uno por nivel** y que ninguno se repita.
 El test `test-historia.cjs` falla si los dos no tienen el mismo largo: eso es a
 propósito, así el arco no se queda atrás del contenido.
 
