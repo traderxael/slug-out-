@@ -80,9 +80,17 @@ node test-potencia.cjs
 
 # 2. Juego real en Edge headless: mide la fisica por pixels y ejercita los controles
 "C:/Users/USUARIO/AppData/Local/Programs/Python/Python312/python.exe" qa-juego.py
+
+# 3. El juego YA PUBLICADO, cargado desde la URL de produccion
+"C:/Users/USUARIO/AppData/Local/Programs/Python/Python312/python.exe" qa-live.py
 ```
 
-La segunda suite mide, entre otras cosas, que un tiro a potencia mínima se detiene en
-`y≈368` y uno a potencia máxima en `y≈280` del canvas (predicción teórica: 375 y 287),
-que el canvas se congela en pausa (0 px cambiados) y que el medidor de potencia aparece
-al apuntar (0 → 1082 px brillantes) sin ensuciar la pantalla en reposo.
+La suite 2 mide, entre otras cosas, que un tiro a potencia baja se detiene en `y≈368`
+y uno a potencia máxima en `y≈280` del canvas (predicción teórica: 375 y 287), que el
+canvas se congela en pausa (0 px cambiados) y que el medidor de potencia aparece al
+apuntar (0 → 1082 px brillantes) sin ensuciar la pantalla en reposo.
+
+La suite 3 corre lo mismo contra `https://traderxael.github.io/slug-out-/`: arranca el
+nivel, dispara 3 pares de tiros con nivel reiniciado entre cada uno (así ningún
+escupitajo del rival baja por la banda de medición) y comprueba que el cargado sube
+más alto en las 3 repeticiones (21 / 28 / 27 px).

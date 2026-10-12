@@ -115,8 +115,18 @@ with sync_playwright() as p:
               for t in ("Seguir jugando","Reiniciar","Sonido","Salir al menú")))
     m = mov(page, ANIM, 500)
     check("en pausa el canvas NO se mueve", m["n"] < 40, f'{m["n"]} px cambiados en pausa')
+    # El BOTON de pausa, clickeado de verdad (no via window.pauseBtn, que funciona
+    # solo porque los id del HTML son tambien propiedades de window)
+    check("existe el boton de pausa en el DOM",
+          page.evaluate("() => document.getElementById('pauseBtn') !== null"))
     page.keyboard.press("p"); page.wait_for_timeout(400)
     check("la tecla P reanuda la partida",
+          page.evaluate("document.getElementById('overlay').style.display") == "none")
+    page.evaluate("() => document.getElementById('pauseBtn').click()"); page.wait_for_timeout(400)
+    check("el BOTON de pausa tambien pausa",
+          page.evaluate("document.getElementById('overlay').style.display") != "none")
+    page.evaluate("() => document.getElementById('btnSeguir').click()"); page.wait_for_timeout(400)
+    check("Seguir reanuda la partida",
           page.evaluate("document.getElementById('overlay').style.display") == "none")
     m = mov(page, ANIM)
     check("al reanudar el canvas vuelve a animarse", m["n"] > 200, f'{m["n"]} px cambiados')
