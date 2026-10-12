@@ -134,6 +134,19 @@
   const SALTO_CD = 2200;      // ms entre saltos
   const SALTO_TELL = 260;     // ms de agachada antes de saltar: el salto se lee
   const GRAV_SALTO = 0.0008;  // px/ms^2 — vuelve en ~750ms, apogeo ~56px
+  // ---------- habilidades elementales del villano ----------
+  // Cada villano usa, durante el combate, la habilidad de SU elemento: la misma
+  // simetria que las babosas del jugador. Todas AVISAN antes de actuar, asi que
+  // se responden con cuando tirar, con que elemento y cuanto cargar.
+  const HAB_CD_BASE = 7000;    // ms base entre habilidad y habilidad
+  const HAB_TELL = 620;        // ms de aviso antes de lanzar (se lee)
+  const HAB_ZONA_T = 4000;     // fuego: cuanto dura el charco
+  const HAB_BURN = 5;          // fuego: daño por tick
+  const HAB_SLOW = 3000;       // agua: cuanto te ralentiza
+  const HAB_STUN = 900;        // tierra: cuanto te aturde
+  const HAB_FREEZE = 1000;     // hielo: cuanto te congela
+  const HAB_DRAIN = 6;         // sombra: vida que te roba
+  const HAB_CURA = 14;         // planta y sombra: cuanto se curan
   const FURIA_HP = 0.5;       // por debajo de esta fraccion el frenetico se enfurece
   const FURIA_SPD = 1.40;     // multiplicador de velocidad enfurecido
   const FURIA_ATK = 0.65;     // multiplicador del intervalo de ataque enfurecido
@@ -583,7 +596,8 @@
       stunT:0, evasion:o.evasion||0,
       arquetipo:o.arquetipo||'normal',
       escOn:false, escT:0, escCd:o.escCd||ESC_CD, escWindup:0,
-      saltoV:0, aire:false, saltoT:0, saltoWindup:0, furia:false
+      saltoV:0, aire:false, saltoT:0, saltoWindup:0, furia:false,
+      habTimer:o.habCd||HAB_CD_BASE, habTell:0, habCd:o.habCd||HAB_CD_BASE
     };
   }
   function statsNivel(L){
@@ -636,7 +650,8 @@
     const s = {
       modo:modo, nivel:L||0, idx:0, wave:1, n: modo==='nivel' ? NIVELES[L-1].n : 0,
       enemy:null, projectiles:[], enemyShots:[], particles:[], bolts:[], drops:[], rocas:[],
-      player:{hp:100,maxHp:100}, selected:equipo[0], equipo:equipo, rar:rar,
+      player:{hp:100,maxHp:100, burnT:0, burnTick:0, slowT:0, stunT:0, freezeT:0}, selected:equipo[0], equipo:equipo, rar:rar,
+      zonas:[],
       cooldown:0, cooldownMax:480, recoil:0, aimAngle:-Math.PI/2, aimPower:1, waveTransition:0, combo:0, maxCombo:0, comboT:0, score:0, shake:0, flash:0,
       cofresRun:0, bannerT:2400, rocaTimer:2600,
       ultiCharge:0, ultiMax:100, ultiFxT:0, eclipseLeft:0,
@@ -880,6 +895,8 @@
   function fire(dirX,dirY,power){
     if(!state || state.waveTransition>0) return false;
     if(state.cooldown>0) return false;
+    // Aturdido o congelado: el tiro no sale. La habilidad del villano se siente.
+    if(state.player.stunT>0 || state.player.freezeT>0) return false;
     if(dirY >= -5) return false;
     const ang = Math.atan2(dirY,dirX);
     const el = state.selected;
@@ -891,7 +908,7 @@
     state.aimAngle = ang;
     state.aimPower = pw;
     // tradeoff: más carga = más daño, pero recarga más larga
-    state.cooldownMax = cooldownFor(pw);
+    state.cooldownMax = cooldownFor(pw)*(state.player.slowT>0?1.6:1);
     state.cooldown = state.cooldownMax;
     state.recoil = 140;
     addParticles(m.x, m.y, '#bdb4a8', 5, 'aire');
@@ -899,12 +916,79 @@
     return true;
   }
 
-  function lanzarEscupitajo(en){
+  function lanzarEscupitajo(en, angOff, perfora){
     const ex = en.x + en.dir*en.r*1.1, ey = en.y-en.r*0.1;
-    const ddx = LX-ex, ddy = LY-ey, dd = Math.sqrt(ddx*ddx+ddy*ddy) || 1;
+    const ang = Math.atan2(LY-ey, LX-ex) + (angOff||0);
     const dmg = en.atkDamage*(en.rafaga>1 ? 0.6 : 1);
-    state.enemyShots.push({x:ex,y:ey,vx:ddx/dd*0.42,vy:ddy/dd*0.42,dmg:dmg,color:ELEMENT_INFO[en.tipo].color,el:en.tipo,trail:[]});
+    const sp = perfora ? 0.55 : 0.42;
+    state.enemyShots.push({x:ex,y:ey,vx:Math.cos(ang)*sp,vy:Math.sin(ang)*sp,dmg:dmg,
+      color:ELEMENT_INFO[en.tipo].color,el:en.tipo,trail:[],perfora:!!perfora});
     sfxSpit();
+  }
+  function curarEnemigo(n){
+    const en = state.enemy;
+    if(!en || en.hp<=0) return;
+    const antes = en.hp;
+    en.hp = Math.min(en.maxHp, en.hp+n);
+    addTextParticle(en.x, en.y-en.r-26, '+'+(en.hp-antes), '#7fb87f', 11);
+    addParticles(en.x, en.y, '#7fb87f', 8, 'planta');
+  }
+
+  // ---------- habilidades elementales del villano ----------
+  // La habilidad de cada elemento, usada CONTRA el jugador. El jugador no se
+  // mueve, asi que ninguna se esquiva: se responde con cuando tirar, con que
+  // elemento y cuanto cargar.
+  function lanzarHabilidad(en){
+    const pl = state.player, col = ELEMENT_INFO[en.tipo].color;
+    const aviso = (txt) => addTextParticle(LX, LY-42, txt, col, 12);
+    switch(en.tipo){
+      case 'fuego':
+        // charco ardiente bajo tus pies: te quema mientras sigas ahi
+        state.zonas.push({x:LX, r:46, t:HAB_ZONA_T, max:HAB_ZONA_T, tick:0});
+        aviso('¡CHARCO!'); beep(220, 0.1, 'sawtooth', 0.08);
+        break;
+      case 'agua':
+        // marea: te alarga la recarga, asi que el proximo tiro llega tarde
+        pl.slowT = HAB_SLOW;
+        aviso('¡MAREA!'); beep(300, 0.1, 'sine', 0.08);
+        break;
+      case 'tierra':
+        // aturdido: no podes disparar (pero conservas la carga)
+        pl.stunT = HAB_STUN;
+        state.shake = Math.max(state.shake, 9);
+        aviso('¡ATURDIDO!'); beep(120, 0.12, 'square', 0.09);
+        break;
+      case 'aire':
+        // abanico perforante: tres tiros en paralelo, no se cubre con elemento
+        for(let k=-1;k<=1;k++) lanzarEscupitajo(en, k*0.22, true);
+        aviso('¡ABANICO!'); beep(420, 0.09, 'triangle', 0.08);
+        break;
+      case 'hielo':
+        // congelado: no podes disparar Y te baja la carga
+        pl.freezeT = HAB_FREEZE;
+        kbdPower = POWER_MIN; state.aimPower = POWER_MIN;
+        aviso('¡CONGELADO!'); beep(700, 0.12, 'sine', 0.09);
+        break;
+      case 'rayo':
+        // descarga doble: el primero avisa que viene el segundo
+        lanzarEscupitajo(en);
+        en.burstLeft = 1; en.burstTimer = 160;
+        aviso('¡DOBLE!'); beep(900, 0.07, 'square', 0.08);
+        break;
+      case 'planta':
+        // se regenera: si no lo bajas de golpe, te gana por desgaste
+        curarEnemigo(HAB_CURA);
+        pl.slowT = Math.max(pl.slowT, 1500);
+        beep(360, 0.1, 'triangle', 0.08);
+        break;
+      case 'sombra':
+        // robo de vida: te drena y se cura con lo que te saca
+        pl.hp = Math.max(1, pl.hp - HAB_DRAIN);
+        curarEnemigo(HAB_CURA);
+        state.flash = Math.max(state.flash, 0.6);
+        aviso('-'+HAB_DRAIN); beep(180, 0.12, 'sawtooth', 0.09);
+        break;
+    }
   }
 
   // ---------- flujo enemigo / update ----------
@@ -1164,6 +1248,16 @@
         if(en.saltoT<=0) en.saltoWindup = SALTO_TELL;
       }
     }
+    // Habilidad elemental: el villano se carga HAB_TELL ms (se lee el color de su
+    // elemento subiendo) y larga la habilidad de SU tipo. Un enemigo aturdido no
+    // llega a cargarla: aturdir tiene recompensa.
+    if(en.habTell>0){
+      en.habTell -= dt;
+      if(en.habTell<=0){ lanzarHabilidad(en); en.habTimer = en.habCd; }
+    } else if(en.stunT<=0){
+      en.habTimer -= dt;
+      if(en.habTimer<=0) en.habTell = HAB_TELL;
+    }
     if(en.burnTicks>0){
       en.burnTimer += dt;
       if(Math.random()<dt/110) addParticles(en.x+(Math.random()-0.5)*en.r*1.6, en.y-en.r*0.4, ELEMENT_INFO.fuego.color, 1, 'fuego');
@@ -1213,6 +1307,28 @@
       }
     }
     tickFx(dt);
+    // ---------- estados del jugador puestos por las habilidades ----------
+    // El charco de fuego quema por tick mientras sigas parado encima.
+    const pl = state.player;
+    for(const z of state.zonas){
+      if(z.t<=0) continue;
+      z.t -= dt;                                 // se agota con el tiempo, este o no encima
+      if(Math.abs(z.x - LX) < z.r){
+        pl.burnT = 700;                        // visual: ardiendo
+        z.tick += dt;
+        if(z.tick>=500){
+          z.tick = 0;
+          pl.hp = Math.max(0, pl.hp - HAB_BURN);
+          state.shake = Math.max(state.shake, 4);
+          addParticles(LX, LY-10, ELEMENT_INFO.fuego.color, 4, 'fuego');
+        }
+      }
+    }
+    for(let i=state.zonas.length-1;i>=0;i--) if(state.zonas[i].t<=0) state.zonas.splice(i,1);
+    if(pl.burnT>0)   pl.burnT   = Math.max(0, pl.burnT-dt);
+    if(pl.slowT>0)   pl.slowT   = Math.max(0, pl.slowT-dt);
+    if(pl.stunT>0)   pl.stunT   = Math.max(0, pl.stunT-dt);
+    if(pl.freezeT>0) pl.freezeT = Math.max(0, pl.freezeT-dt);
     if(state.player.hp<=0){ endGame(); return; }
     if(en.hp<=0 && state.waveTransition<=0){
       state.waveTransition = 900;
@@ -1322,6 +1438,21 @@
       ctx.ellipse(en.x, en.y+en.r*0.55, en.r*(1.35-0.25*t), en.r*0.42, 0, 0, Math.PI*2);
       ctx.stroke(); ctx.restore();
     }
+    // Aviso de la habilidad elemental: el anillo se cierra con el COLOR DEL
+    // ELEMENTO, asi que se lee CUAL habilidad viene antes de que salga.
+    if(en.habTell>0){
+      const t = 1 - en.habTell/HAB_TELL;
+      const col = ELEMENT_INFO[en.tipo].color;
+      ctx.save(); ctx.lineWidth = 2.5;
+      ctx.strokeStyle = rgba(col, 0.30+0.50*t);
+      ctx.beginPath();
+      ctx.ellipse(en.x,en.y,en.r*1.7+18,en.r+18,0,-Math.PI/2,-Math.PI/2+t*Math.PI*2);
+      ctx.stroke();
+      // chispas del elemento mientras carga
+      if(t>0.4 && Math.random()<0.3)
+        addParticles(en.x, en.y, col, 1, en.tipo);
+      ctx.restore();
+    }
     if(en.furia){
       // aura roja que late: dice "cambio de ritmo" sin texto
       const pulso = 0.5+0.5*Math.sin(Date.now()/95);
@@ -1333,6 +1464,75 @@
     }
     ctx.restore();
   }
+  // ---------- dibujo de las habilidades ----------
+  // El charco de fuego: un pileton que late bajo tus pies. Se ve donde pisas.
+  function drawZonas(){
+    if(!state || !state.zonas) return;
+    const t = Date.now();
+    for(const z of state.zonas){
+      if(z.t<=0) continue;
+      const vida = z.t/z.max;
+      ctx.save();
+      ctx.fillStyle = 'rgba(224,90,48,'+(0.10+0.10*vida)+')';
+      ctx.beginPath(); ctx.ellipse(z.x, LY+6, z.r, 9, 0, 0, Math.PI*2); ctx.fill();
+      ctx.strokeStyle = 'rgba(224,90,48,'+(0.35+0.35*vida)+')'; ctx.lineWidth = 1.5;
+      ctx.beginPath(); ctx.ellipse(z.x, LY+6, z.r, 9, 0, 0, Math.PI*2); ctx.stroke();
+      // lenguas de fuego
+      for(let i=0;i<5;i++){
+        const fx = z.x - z.r*0.7 + i*(z.r*1.4/4);
+        const h = 6 + Math.sin(t/90 + i*1.7)*3 + vida*4;
+        ctx.fillStyle = 'rgba(232,120,60,'+(0.30+0.30*vida)+')';
+        ctx.beginPath();
+        ctx.moveTo(fx-3, LY+4); ctx.lineTo(fx, LY+4-h); ctx.lineTo(fx+3, LY+4);
+        ctx.closePath(); ctx.fill();
+      }
+      ctx.restore();
+    }
+  }
+  // Los estados que las habilidades le ponen al jugador. Cada uno se ve distinto:
+  // si no se vieran, el jugador no sabria por que no puede tirar.
+  function drawEstadoJugador(){
+    if(!state) return;
+    const pl = state.player, t = Date.now();
+    if(pl.freezeT>0){
+      ctx.save();
+      ctx.strokeStyle = 'rgba(111,214,230,.9)'; ctx.lineWidth = 2;
+      for(let i=0;i<3;i++){
+        const a = t/700 + i*2.1;
+        ctx.beginPath();
+        ctx.moveTo(LX-16+Math.cos(a)*4, LY-30);
+        ctx.lineTo(LX+16+Math.cos(a)*4, LY-6);
+        ctx.stroke();
+      }
+      ctx.fillStyle = 'rgba(111,214,230,.16)';
+      ctx.beginPath(); ctx.ellipse(LX, LY-18, 22, 26, 0, 0, Math.PI*2); ctx.fill();
+      ctx.restore();
+    } else if(pl.stunT>0){
+      ctx.save(); ctx.fillStyle = '#ffc371'; ctx.font = '11px sans-serif'; ctx.textAlign='center';
+      const a = pl.stunT/60;
+      ctx.fillText('✦', LX-10, LY-34+Math.sin(a)*3);
+      ctx.fillText('✦', LX+10, LY-38+Math.cos(a)*3);
+      ctx.restore();
+    }
+    if(pl.burnT>0){
+      ctx.save();
+      for(let i=0;i<3;i++){
+        const fx = LX-9+i*9, h = 7+Math.sin(t/70+i*2)*4;
+        ctx.fillStyle = 'rgba(224,90,48,.55)';
+        ctx.beginPath();
+        ctx.moveTo(fx-3.5, LY-4); ctx.lineTo(fx, LY-4-h); ctx.lineTo(fx+3.5, LY-4);
+        ctx.closePath(); ctx.fill();
+      }
+      ctx.restore();
+    }
+    if(pl.slowT>0){
+      ctx.save(); ctx.fillStyle = 'rgba(63,149,207,.75)'; ctx.font='11px sans-serif'; ctx.textAlign='center';
+      ctx.fillText('≈', LX-14, LY-40+Math.sin(t/300)*2);
+      ctx.fillText('≈', LX+14, LY-44+Math.cos(t/300)*2);
+      ctx.restore();
+    }
+  }
+
   function drawTrail(tr, col, w0){
     ctx.save(); ctx.lineCap = 'round';
     for(let i=1;i<tr.length;i++){
@@ -1646,6 +1846,8 @@
       }
       state.enemyShots.forEach(drawEnemyShot);
       drawRocas();
+      drawZonas();
+      drawEstadoJugador();
       state.projectiles.forEach(drawProjectile);
       drawBolts();
       drawParticles();
@@ -2117,6 +2319,7 @@
       +'<p style="text-align:left;font-size:12px;color:#ff8a6a;"><b>🎯 Esquiva telegrafiada</b><br>El rival <b>avisa</b> antes de esquivar: se agacha y aparece un anillo naranja que se cierra. Durante esa ventana está quieto — si le acertás, la esquiva se <b>CANCELA</b> (¡INTERRUMPIDO!) y queda aturdido. Un tiro <b>pesado</b> llega antes de que complete la esquiva; uno flojo llega tarde y ya se movió. Más carga = más fiable contra la evasión.</p>'
       +'<p style="text-align:left;font-size:12px;color:#c9a86a;"><b>🪨 Rocas que caen</b><br>El techo suelta rocas. Antes de caer se marcan con un triángulo que tiembla sobre la columna: <b>leé por dónde va a caer</b> y elegí. Una roca en el camino <b>consume tu tiro</b> (se rompe a los pocos golpes), y si cae por tu columna <b>te golpea</b>. Cambiá de columna, apurá el tiro, o rompela antes de que caiga.</p>'
       +'<p style="text-align:left;font-size:12px;color:#7fd4ff;"><b>🛡️ Enemigos con comportamiento</b><br>No todos son iguales, y cada uno te obliga a responder distinto:<br>· <b>Escudado</b> (nivel 4+): levanta un escudo que <b>absorbe tu tiro</b>. El anillo cian se cierra antes de subir: esperá a que baje, cambiá de elemento, o gastá el tiro a propósito.<br>· <b>Saltarín</b> (nivel 7+): se agacha y <b>salta</b>. Leé la altura antes de tirar.<br>· <b>Frenético</b> (todos los jefes): al bajar de la mitad de la vida <b>se enfurece</b> — aura roja, se mueve más rápido y ataca más seguido. Bajalo de golpe o bancate la andanada.</p>'
+      +'<p style="text-align:left;font-size:12px;color:#b9a6e8;"><b>🎨 La habilidad de su elemento</b><br>Cada villano usa contra vos <b>la habilidad de SU elemento</b>, igual que tus babosas. El anillo de carga se pinta del color del elemento, así que <b>leés cuál viene</b> antes de que salga:<br>· <b>🔥 Fuego</b>: charco ardiente bajo tus pies que te quema<br>· <b>💧 Agua</b>: marea que te alarga la recarga<br>· <b>🪨 Tierra</b>: te aturde — no disparás, pero conservás la carga<br>· <b>🌪️ Aire</b>: abanico de 3 tiros perforantes<br>· <b>❄️ Hielo</b>: te congela — no disparás <b>y te baja la carga</b><br>· <b>⚡ Rayo</b>: descarga doble, el primero avisa el segundo<br>· <b>🌿 Planta</b>: se regenera y te enreda<br>· <b>🌑 Sombra</b>: te roba vida y se cura con ella</p>'
       +'<p style="text-align:left;font-size:12px;color:#6ad4ff;"><b>Teclado (PC)</b><br>← → apuntar · ↑ ↓ potencia · Espacio disparar · 1-8 elemento · U ULTI · P pausa · M sonido · R reiniciar</p>'
       +'<p style="text-align:left;font-size:11px;">'+ventajas+'</p>'
       +'<p style="text-align:left;font-size:11px;">'+habil+'</p>'

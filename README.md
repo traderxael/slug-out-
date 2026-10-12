@@ -112,6 +112,30 @@ Lo que agrega esto no es contenido: son tres decisiones más. Con las rocas, cad
 tiro ahora se responde a *cuánto cargo*, *por dónde* y *cuándo* — y contra cada
 enemigo, *qué*.
 
+## 🎨 Cada villano usa la habilidad de su elemento
+
+La simetría que faltaba: **tus babosas tienen habilidades elementales, y los
+villanos también** — las usan contra vos. El anillo de carga se pinta del color
+del elemento, así que leés **cuál** viene antes de que salga.
+
+| Elemento | Habilidad del villano | Cómo se responde |
+|---|---|---|
+| 🔥 **Fuego** | Charco ardiente bajo tus pies que te quema (−5 cada 0.5s, 4s) | Matarlo rápido o bancarse el ardor |
+| 💧 **Agua** | Marea que te alarga la recarga **1.6×** | Planear el próximo tiro sabiendo que llega tarde |
+| 🪨 **Tierra** | Te **aturde** 0.9s — no disparás | No comprometer una carga completa justo antes |
+| 🌪️ **Aire** | Abanico de **3 tiros perforantes** | Cambiar de elemento para cubrir |
+| ❄️ **Hielo** | Te **congela** 1s — no disparás **y te baja la carga** | Distinto a tierra: acá perdés la carga |
+| ⚡ **Rayo** | **Descarga doble** rápida | El primero te avisa que viene el segundo |
+| 🌿 **Planta** | Se **regenera** (+14) y te enreda | Bajarlo de golpe o te gana por desgaste |
+| 🌑 **Sombra** | Te **roba vida** (−6) y se cura con ella | Matarlo antes de que el dreno se acumule |
+
+El jugador no se mueve, así que **ninguna se esquiva**: se responden con *cuándo*
+tirar, *con qué elemento* y *cuánto cargar*. Aturdir al villano cancela su
+carga — aturdir tiene recompensa.
+
+Con rocas y arquetipos, cada tiro ahora se decide por *cuánto cargo*, *por dónde*
+y *contra quién* — y además hay que leer *qué* te va a largar.
+
 ## ⚔️ Elementos
 
 | Elemento | Habilidad | ULTI |
@@ -182,7 +206,16 @@ node test-arquetipos-visual.cjs
 # 16. End-to-end en Edge real: el juego corre sin errores y la furia se ve jugando
 "C:/Users/USUARIO/AppData/Local/Programs/Python/Python312/python.exe" test-arquetipos-browser.py
 
-# 17. El juego YA PUBLICADO, cargado desde la URL de produccion
+# 17-22. Habilidades elementales del villano: que las 8 se activen solas y
+#        avisadas, que SE SIENTAN sobre el jugador, y que se vean
+node test-habilidades.cjs
+node test-habilidades-efectos.cjs
+node test-habilidades-visual.cjs
+
+# 23. End-to-end en Edge real: salen solas jugando y se ven por su color
+"C:/Users/USUARIO/AppData/Local/Programs/Python/Python312/python.exe" test-habilidades-browser.py
+
+# 24. El juego YA PUBLICADO, cargado desde la URL de produccion
 "C:/Users/USUARIO/AppData/Local/Programs/Python/Python312/python.exe" qa-live.py
 ```
 
@@ -192,7 +225,7 @@ La suite 15 no cuenta píxeles: usa el modo de grabación del harness
 escudo cian `(127,212,255)` y el proyectil de hielo `#6fd6e6` son casi el mismo
 tono: un conteo por color habría dado un falso positivo permanente.
 
-Las suites 3-6 y 10-15 se escribieron **primero que el código** (TDD): cada una se
+Las suites 3-6, 10-15 y 17-22 se escribieron **primero que el código** (TDD): cada una se
 vio fallar por el motivo correcto antes de implementar. La 9 mide el **delta**
 contra la línea base porque la cornisa y el fondo ya son marrones y suman píxeles
 aunque no haya ninguna roca: medir absolutos habría dado un falso positivo.

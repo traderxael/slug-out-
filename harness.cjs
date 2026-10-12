@@ -28,17 +28,19 @@ function makeCtx(canvasEl, rec){
           width: w|0, height: h|0
         });
       if (k === 'measureText') return () => ({ width: 10 });
-      // Modo grabacion: cada stroke()/fill() anota el estilo vigente. Sirve para
+      // Modo grabacion: cada trazo o texto anota el estilo vigente. Sirve para
       // verificar QUE se dibuja y de que color sin adivinar por pixels, algo
       // imposible cuando dos entidades comparten tono: el escudo cian
       // (127,212,255) y el proyectil de hielo (#6fd6e6) son casi el mismo color,
       // y contarlos juntos daria un falso positivo permanente.
-      if (rec && (k === 'stroke' || k === 'fill')){
-        return () => {
+      // Incluye fillText/strokeText: varios estados se dibujan con glifos, no
+      // con trazos, y sin grabarlos parecerian ausentes.
+      if (rec && (k === 'stroke' || k === 'fill' || k === 'fillText' || k === 'strokeText')){
+        return (...args) => {
           // Solo los estilos cadena son comparables: un gradiente llega como
           // objeto (el createLinearGradient no-op devuelve el proxy) y romperia
           // cualquier String() del consumidor. Se anota null y listo.
-          rec.push({ op: k,
+          rec.push({ op: k, text: args[0],
                      stroke: typeof t.strokeStyle === 'string' ? t.strokeStyle : null,
                      fill:   typeof t.fillStyle   === 'string' ? t.fillStyle   : null,
                      lineWidth: t.lineWidth });
