@@ -112,6 +112,8 @@ function buildGame(opts){
     arquetipoDe, arquetipoInfinito, enemigoNivel, enemigoInfinito, crearEnemigo,
     equipoActual, baseSave, normalizeSave, mejorRareza, renderMenu,
     toggleEquipo, renderEquipo, EQUIPO_MAX,
+    statsNivel, LOGROS, COFRES,
+    renderHistoria, histVistas,
     get overlayHTML(){ return overlayEl.innerHTML; }
 };`;
   const close = src.lastIndexOf('})();');
@@ -129,6 +131,10 @@ function buildGame(opts){
   const documentStub = {
     getElementById: (id) => els[id] || (els[id] = makeEl('div')),
     createElement: (tag) => makeEl(tag),
+    // Las pantallas nuevas enganchan los clics por selector. El stub no parsea
+    // el HTML, asi que no hay nodos que devolver: la lista vacia hace que el
+    // forEach no haga nada (en el browser real si engancha).
+    querySelectorAll: () => [],
     addEventListener(){}, removeEventListener(){},
     body: makeEl('body'), documentElement: makeEl('html'),
     hidden: false, visibilityState: 'visible'
