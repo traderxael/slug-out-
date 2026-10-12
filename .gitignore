@@ -1,2 +1,4 @@
 *.bak-*
 _chk.js
+__pycache__/
+*.pyc
