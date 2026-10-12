@@ -53,8 +53,15 @@ test de Node puede recorrer `victoria → historia → siguiente nivel` completo
 | ~140 | `ELEMENT_INFO`, `ELKEYS`, `RING` (qué elemento vence a cuál) |
 
 ### Guardado y progresión
-197 `loadSave` · 209 `normalizeSave` · 229 `actualizarRacha` · 268 `checkLogros` ·
-292 `generarDesafios` · 306 `actualizarDesafios`
+197 `loadSave` · **209 `baseSave` (incluye `equipo`, las 3 del combate)** · **216
+`normalizeSave` (sanea el equipo: sin repetidas, sin las que no tenés, tope 3)** ·
+229 `actualizarRacha` · 268 `checkLogros` · 292 `generarDesafios` · 306
+`actualizarDesafios`
+
+### Colección y equipo
+667 `mejorRareza` · **674 `equipoActual` (las 3 elegidas, no la mochila)** ·
+**688 `toggleEquipo` (la única puerta: marca/saca, y se niega a dejar 0 o pasar de
+3)** · 706 `totalCofres`
 
 ### Enemigos y dificultad
 650 `crearEnemigo` · 668 `statsNivel` (**el balance: HP y daño por nivel**) ·
@@ -82,7 +89,9 @@ test de Node puede recorrer `victoria → historia → siguiente nivel` completo
 ### Estado, loop y pantallas
 1872 `draw` · 1954 `loop` · 2010 `programarFin` · 2054 `iniciar` ·
 **2067 `ganarNivel` (donde se engancha la mini historia)** · 2114 `endGame` ·
-2197 `renderMenu` · 2226 `renderNiveles` · 2237 `renderCofres` · 2381 `renderAyuda`
+2197 `renderMenu` (botón **Equipo** con el contador) · 2226 `renderNiveles` ·
+2237 `renderCofres` · **2425 `renderEquipo` (el selector de babosas)** · 2381
+`renderAyuda`
 
 ---
 
@@ -140,7 +149,34 @@ todos los niveles**, incluso contra el jefe. El counterplay de potencia no se to
 `test-esquiva-browser.py` (el tell se dibuja y la esquiva completa de verdad).
 `test-esquiva-balance.cjs` se reescribió porque extraía el `dy<160` que se quitó.
 
-### 2. Candidatos (ideas, no compromisos)
+### 2. Al combate entraban TODAS las babosas de la mochila ✅ HECHO
+
+`equipoActual()` era `ELKEYS.filter(el=>mejorRareza(el)>=0)`: devolvía las 8 en
+cuanto las desbloqueabas. El selector de abajo las mostraba todas y "cambiar de
+babosa" era recorrer un inventario — **no había ninguna elección que hacer**.
+
+**Cómo se arregló:** el equipo pasó al save (`save.equipo`, un array de a lo sumo
+`EQUIPO_MAX = 3` claves de elemento) y `equipoActual()` devuelve *esas*, no la
+mochila. `normalizeSave` las sanea al cargar: descarta las que ya no tenés, las
+repetidas y las que sobren del tope, y si el save quedó vacío o corrupto cae a las
+primeras 3 de la mochila — **nunca en 0**, porque el combate necesita al menos una.
+
+`toggleEquipo(el)` es la única puerta de entrada y se niega a los tres casos que
+romperían la regla: una babosa que no tenés, una cuarta cuando ya hay 3, y sacar
+la última.
+
+La pantalla (`renderEquipo`, botón **Equipo** en el menú) muestra solo la mochila;
+la que está en el equipo lleva el borde de su color y un tilde, y con el equipo
+lleno las demás se apagan. El estado se lee de un vistazo, igual que el resto del
+juego.
+
+**Tests:** `test-equipo.cjs` (22 checks: el tope, el guardado, el saneado, el
+combate arrancando con las 3 elegidas y las reglas de marcar) y
+`test-equipo-browser.py` (Edge real: abrir el selector, marcar y desmarcar con el
+mouse, el equipo guardado en `localStorage`, y el selector de combate pintando
+exactamente los 3 nombres elegidos). Ambos se escribieron antes que el código.
+
+### 3. Candidatos (ideas, no compromisos)
 
 - **El nivel 1 como tutorial.** Es el primer contacto y ya tiene rocas y
   habilidades del rival desde el arranque. Podría ser el único nivel sin ninguna

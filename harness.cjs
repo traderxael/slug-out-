@@ -110,6 +110,8 @@ function buildGame(opts){
     // tests puedan disparar clics sobre el overlay.
     HISTORIA, mostrarHistoria, ganarNivel,
     arquetipoDe, arquetipoInfinito, enemigoNivel, enemigoInfinito, crearEnemigo,
+    equipoActual, baseSave, normalizeSave, mejorRareza, renderMenu,
+    toggleEquipo, renderEquipo, EQUIPO_MAX,
     get overlayHTML(){ return overlayEl.innerHTML; }
 };`;
   const close = src.lastIndexOf('})();');
