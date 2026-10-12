@@ -86,6 +86,11 @@
   };
   const UI = { bg:'#101014', panel:'#17171c', ink:'#eaeaf2', dim:'#8a8a99', accent:'#6ad4ff' };
   const ELKEYS = Object.keys(ELEMENT_INFO);
+  // ======== EQUIPO: cuantas babosas entran al combate ========
+  // El jugador ELIGE cuales. Antes entraban todas las de la mochila, asi que
+  // "elegir babosa" no significaba nada. Es el mismo tope que se lee en el
+  // selector de abajo y en la pantalla de equipo.
+  const EQUIPO_MAX = 3;
   const RING = ['fuego','hielo','planta','rayo','tierra','sombra','aire','agua'];
   function vence(a,b){ const i = RING.indexOf(a); return RING[(i+1)%8]===b || RING[(i+2)%8]===b || RING[(i+3)%8]===b; }
   // 5 rarezas (nueva: LEGENDARIA)
@@ -203,7 +208,9 @@
       mejorOla:0, mejorPuntaje:0, gemas:0, nivel:1, estrellas:{}, tiene:t,
       cofres:{madera:1,hierro:0,dorado:0,cristal:0,mitico:0},
       stats:{ partidas:0, combos:0, cofresAbiertos:0, babosas:0, jefes:0, ultis:0, danoTotal:0, criticos:0, cargasMax:0 },
-      logros:{}, racha:{ dias:0, ultima:'' }, desafios:{ fecha:'', lista:[] }, mute:false
+      logros:{}, racha:{ dias:0, ultima:'' }, desafios:{ fecha:'', lista:[] }, mute:false,
+      // Las 3 babosas con las que entras al combate. Se eligen en el selector.
+      equipo:['fuego','agua','tierra']
     };
   }
   function normalizeSave(s){
@@ -220,6 +227,24 @@
     if(s.racha && typeof s.racha==='object'){ if(typeof s.racha.dias==='number'&&s.racha.dias>=0) o.racha.dias=Math.floor(s.racha.dias); if(typeof s.racha.ultima==='string') o.racha.ultima=s.racha.ultima; }
     if(s.desafios && typeof s.desafios==='object'){ if(typeof s.desafios.fecha==='string') o.desafios.fecha=s.desafios.fecha; if(Array.isArray(s.desafios.lista)) o.desafios.lista=s.desafios.lista.filter(d=>d&&typeof d.id==='string'); }
     if(typeof s.mute==='boolean') o.mute = s.mute;
+    // ---- equipo: solo babosas que tengas, sin repetir, maximo 3 ----
+    // Un save viejo no trae el campo, y uno corrupto puede traer cualquier
+    // cosa: en los dos casos cae a las primeras 3 de la mochila. Nunca queda
+    // en 0 porque el combate necesita al menos una babosa.
+    if(Array.isArray(s.equipo)){
+      const limpio = [];
+      for(let i=0;i<s.equipo.length && limpio.length<EQUIPO_MAX;i++){
+        const el = s.equipo[i];
+        if(typeof el!=='string' || !ELEMENT_INFO[el]) continue;
+        if(!o.tiene[el] || !o.tiene[el].some(v=>v>0)) continue;  // ya no la tenes
+        if(limpio.indexOf(el)>=0) continue;                       // repetida
+        limpio.push(el);
+      }
+      o.equipo = limpio;
+    }
+    if(!o.equipo.length){
+      o.equipo = ELKEYS.filter(el => o.tiene[el] && o.tiene[el].some(v=>v>0)).slice(0, EQUIPO_MAX);
+    }
     return o;
   }
   let save = normalizeSave(loadSave());
@@ -634,7 +659,34 @@
 
   // ---------- colección ----------
   function mejorRareza(el){ const a = save.tiene[el]; for(let r=4;r>=0;r--) if(a[r]) return r; return -1; }
-  function equipoActual(){ return ELKEYS.filter(el=>mejorRareza(el)>=0); }
+  // ======== EQUIPO DE COMBATE ========
+  // Las babosas con las que entras a pelear. Antes esto devolvia TODAS las de la
+  // mochila, asi que el selector de abajo no era una eleccion: era un inventario.
+  // Ahora devuelve las que marcaste (maximo EQUIPO_MAX), y si el save quedo
+  // corrupto o vacio cae a las primeras de la mochila para no dejarte en 0.
+  function equipoActual(){
+    const eq = (save.equipo||[]).filter(el => ELEMENT_INFO[el] && save.tiene[el] && save.tiene[el].some(v=>v>0));
+    if(eq.length) return eq.slice(0, EQUIPO_MAX);
+    return ELKEYS.filter(el => save.tiene[el] && save.tiene[el].some(v=>v>0)).slice(0, EQUIPO_MAX);
+  }
+  // Marca o saca una babosa del equipo. Devuelve false (y no cambia nada) si
+  // no la tenes, si ya son 3, o si sacarias la ultima.
+  function toggleEquipo(el){
+    if(!ELEMENT_INFO[el]) return false;
+    if(!save.tiene[el] || !save.tiene[el].some(v=>v>0)) return false;
+    const eq = equipoActual();
+    const i = eq.indexOf(el);
+    if(i>=0){
+      if(eq.length<=1) return false;          // nunca te deja sin ninguna
+      eq.splice(i,1);
+    }else{
+      if(eq.length>=EQUIPO_MAX) return false; // ya son 3, hay que sacar una
+      eq.push(el);
+    }
+    save.equipo = eq;
+    saveGame();
+    return true;
+  }
   function totalCofres(){ return save.cofres.madera + save.cofres.hierro + save.cofres.dorado + save.cofres.cristal + save.cofres.mitico; }
   function totalBabosas(){ let n = 0; ELKEYS.forEach(el=>save.tiene[el].forEach(v=>{ if(v) n++; })); return n; }
 
@@ -2225,6 +2277,7 @@
       +'<p>Nueva versión: <b>potencia de tiro</b> (arrastrá más lejos = más daño), pausa, controles de teclado, '+LOGROS.length+' logros y sonido silenciable.</p>'
       +'<p style="font-size:12px;color:#ffd700;">'+rachaTxt+'</p>'
       +'<button class="btn" id="btnNiveles">Niveles</button>'
+    +'<button class="btnAlt" id="btnEquipo">🐌 Equipo · '+equipoActual().length+'/'+EQUIPO_MAX+'</button>'
       +'<button class="btn btnAlt" id="btnInfinito">Modo infinito</button>'
       +'<button class="btn btnAlt" id="btnCofres">Cofres'+(n?' ('+n+')':'')+'</button>'
       +'<button class="btn btnAlt" id="btnColeccion">Colección '+totalBabosas()+'/40</button>'
@@ -2235,6 +2288,7 @@
       +'<p style="font-size:12px;color:#6ad4ff;">Gemas: '+save.gemas+' · Récord infinito: ola '+save.mejorOla+' · '+save.mejorPuntaje+' pts</p>'
     );
     bind('btnNiveles', renderNiveles);
+    bind('btnEquipo', renderEquipo);
     bind('btnInfinito', ()=>iniciar('infinito'));
     bind('btnCofres', renderCofres);
     bind('btnColeccion', renderColeccion);
@@ -2363,6 +2417,46 @@
     });
     bind('btnVolver', renderMenu);
   }
+  // ---------- selector de babosas (equipo de combate) ----------
+  // Solo las que ya tenes, y hasta EQUIPO_MAX marcadas. La que esta en el equipo
+  // lleva el borde de su color y un tilde: se lee de un vistazo, no hay que
+  // acordarse de nada. Tocar una desmarcada la agrega; tocar una marcada la
+  // saca (siempre que no sea la ultima).
+  function renderEquipo(){
+    detenerJuego();
+    const eq = equipoActual();
+    let celdas = '';
+    ELKEYS.forEach(el=>{
+      const r = mejorRareza(el);
+      if(r<0) return;                                  // no la tenes: no se muestra
+      const enEq = eq.indexOf(el)>=0;
+      const lleno = eq.length>=EQUIPO_MAX && !enEq;
+      celdas += '<div class="celda" data-el="'+el+'" style="cursor:'+(lleno?'not-allowed':'pointer')+
+        ';border:2px solid '+(enEq?ELEMENT_INFO[el].color:'transparent')+
+        ';border-radius:10px;padding:4px 2px;opacity:'+(lleno?.45:1)+'">'+
+        cvTag('cv_eq_'+el,72,56)+
+        '<div class="nm" style="color:'+ELEMENT_INFO[el].color+'">'+BABOSAS[el][r]+'</div>'+
+        '<div class="nm" style="color:'+(enEq?RAREZA[r].c:'transparent')+'">✓</div>'+
+        '</div>';
+    });
+    showOverlay('<h2>Equipo de combate</h2>'
+      +'<p>Elegí '+EQUIPO_MAX+' babosas · <b style="color:var(--accent)">'+eq.length+'/'+EQUIPO_MAX+'</b></p>'
+      +'<div class="grid" style="grid-template-columns:1fr 1fr 1fr;max-width:300px">'+celdas+'</div>'
+      +'<p style="font-size:11px;color:var(--dim);max-width:300px">Tocá para marcar o sacar. Las que estén en el equipo son las que entran al combate.</p>'
+      +'<button class="btn btnAlt" id="btnVolver">Volver</button>');
+    ELKEYS.forEach(el=>{
+      const r = mejorRareza(el);
+      if(r<0) return;
+      const g = prepCanvas('cv_eq_'+el,72,56);
+      if(g) dibujarBabosa(g,72,56,el,r,true);
+    });
+    document.querySelectorAll('[data-el]').forEach(node=>{
+      node.addEventListener('click', ()=>{
+        if(toggleEquipo(node.getAttribute('data-el'))) renderEquipo();  // redibuja con el nuevo equipo
+      });
+    });
+    bind('btnVolver', renderMenu);
+  }
   function renderDesafios(){
     detenerJuego();
     generarDesafios();
@@ -2410,7 +2504,8 @@
       +'<p style="text-align:left;font-size:12px;color:#7fd4ff;"><b>🛡️ Enemigos con comportamiento</b><br>No todos son iguales, y cada uno te obliga a responder distinto:<br>· <b>Escudado</b> (nivel 4+): levanta un escudo que <b>absorbe tu tiro</b>. El anillo cian se cierra antes de subir: esperá a que baje, cambiá de elemento, o gastá el tiro a propósito.<br>· <b>Saltarín</b> (nivel 7+): se agacha y <b>salta</b>. Leé la altura antes de tirar.<br>· <b>Frenético</b> (todos los jefes): al bajar de la mitad de la vida <b>se enfurece</b> — aura roja, se mueve más rápido y ataca más seguido. Bajalo de golpe o bancate la andanada.</p>'
       +'<p style="text-align:left;font-size:12px;color:#b9a6e8;"><b>🎨 La habilidad de su elemento</b><br>Cada villano usa contra vos <b>la habilidad de SU elemento</b>, igual que tus babosas. El anillo de carga se pinta del color del elemento, así que <b>leés cuál viene</b> antes de que salga:<br>· <b>🔥 Fuego</b>: charco ardiente bajo tus pies que te quema<br>· <b>💧 Agua</b>: marea que te alarga la recarga<br>· <b>🪨 Tierra</b>: te aturde — no disparás, pero conservás la carga<br>· <b>🌪️ Aire</b>: abanico de 3 tiros perforantes<br>· <b>❄️ Hielo</b>: te congela — no disparás <b>y te baja la carga</b><br>· <b>⚡ Rayo</b>: descarga doble, el primero avisa el segundo<br>· <b>🌿 Planta</b>: se regenera y te enreda<br>· <b>🌑 Sombra</b>: te roba vida y se cura con ella</p>'
       +'<p style="text-align:left;font-size:12px;color:#b9a6e8;"><b>📖 La historia de la campana</b><br>Tras cada combate ganado, un pedazo de historia cuenta qué pasa en la cueva y por qué la estás recorriendo. El arco se lee con los elementos: el fuego que seca, el hielo que conserva, la sombra que drena. Si no te interesa, <b>Saltar</b> y listo.</p>'
-      +'<p style="text-align:left;font-size:12px;color:#6ad4ff;"><b>Teclado (PC)</b><br>← → apuntar · ↑ ↓ potencia · Espacio disparar · 1-8 elemento · U ULTI · P pausa · M sonido · R reiniciar</p>'
+      +'<p style="text-align:left;font-size:12px;color:#8fd68a;"><b>🐌 Tu equipo de combate</b><br>Tenés una mochila con babosas, pero al combate entran <b>solo 3</b>. En el menú, <b>Equipo</b> abre el selector: tocá una babosa de la mochila para meterla, y tocá una del equipo para sacarla. Las marcadas llevan el borde de su color. Cuando el equipo está lleno las demás se apagan: hay que sacar una antes de meter otra. El equipo queda guardado, así que elegís una vez y peleás siempre con esas 3. En combate cambiás entre ellas con el selector de abajo o las teclas <b>1, 2 y 3</b>.</p>'
+      +'<p style="text-align:left;font-size:12px;color:#6ad4ff;"><b>Teclado (PC)</b><br>← → apuntar · ↑ ↓ potencia · Espacio disparar · 1-3 elemento · U ULTI · P pausa · M sonido · R reiniciar</p>'
       +'<p style="text-align:left;font-size:11px;">'+ventajas+'</p>'
       +'<p style="text-align:left;font-size:11px;">'+habil+'</p>'
       +'<p>Cada nivel termina con un Guardián. Ganás gemas y cofres. Los enemigos pueden <b>esquivar</b>: <b>avisan</b> antes con un anillo naranja, y si les acertás en esa ventana la esquiva se cancela. El <b>combo</b> caduca a los 5 segundos sin acertar.</p>'

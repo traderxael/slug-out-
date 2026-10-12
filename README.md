@@ -202,6 +202,12 @@ se lee con el mismo lenguaje que el combate.
 
 - **12 niveles** con Guardianes jefes
 - **Modo infinito** con dificultad progresiva
+- **Equipo de combate de 3 babosas**: juntás una mochila de hasta 8 elementos, pero
+  al combate entran **solo las 3 que elijas**. En el menú, **Equipo** abre el
+  selector: tocá una de la mochila para meterla, tocá una del equipo para sacarla.
+  Las marcadas llevan el borde de su color, y con el equipo lleno las demás se
+  apagan (hay que sacar una antes de meter otra). La elección queda guardada, así
+  que armás el equipo una vez y peleás siempre con esas 3.
 - **5 cofres**: madera, hierro, dorado, cristal y mítico
 - **25 logros** desbloqueables (incluye *Francotirador* por críticos y *A toda carga*
   por disparos a carga máxima)
@@ -280,6 +286,15 @@ node test-historia.cjs
 
 # 26. El juego YA PUBLICADO, cargado desde la URL de produccion
 "C:/Users/USUARIO/AppData/Local/Programs/Python/Python312/python.exe" qa-live.py
+
+# 27. El equipo de combate: con las 8 en la mochila entran 3, y son las que
+#     elegis. Cubre el guardado, el saneado al cargar y las reglas de marcar
+node test-equipo.cjs
+
+# 28. End-to-end en Edge real: abrir el selector, marcar y desmarcar con el
+#     mouse, y que el combate arranque con esas 3 (instrumenta ctx.fillText
+#     para leer los nombres que pinta el selector de abajo)
+"C:/Users/USUARIO/AppData/Local/Programs/Python/Python312/python.exe" test-equipo-browser.py
 ```
 
 La suite 16 no cuenta píxeles: usa el modo de grabación del harness
@@ -288,10 +303,11 @@ La suite 16 no cuenta píxeles: usa el modo de grabación del harness
 porque el escudo cian `(127,212,255)` y el proyectil de hielo `#6fd6e6` son casi el mismo
 tono: un conteo por color habría dado un falso positivo permanente.
 
-Las suites 4-7, 12-17, 19-22 y 24 se escribieron **primero que el código** (TDD): cada
-una se vio fallar por el motivo correcto antes de implementar. La 11 mide el **delta**
-contra la línea base porque la cornisa y el fondo ya son marrones y suman píxeles
-aunque no haya ninguna roca: medir absolutos habría dado un falso positivo.
+Las suites 4-7, 12-17, 19-22, 24 y 27 se escribieron **primero que el código**
+(TDD): cada una se vio fallar por el motivo correcto antes de implementar. La 11
+mide el **delta** contra la línea base porque la cornisa y el fondo ya son marrones
+y suman píxeles aunque no haya ninguna roca: medir absolutos habría dado un falso
+positivo.
 
 La suite 2 mide, entre otras cosas, que un tiro a potencia baja se detiene en `y≈368`
 y uno a potencia máxima en `y≈280` del canvas (predicción teórica: 375 y 287), que el
