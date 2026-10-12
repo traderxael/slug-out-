@@ -1,0 +1,133 @@
+/**
+ * Harness: ejecuta el index.html REAL en Node con el DOM y el audio stubeados.
+ *
+ * El juego vive dentro de un IIFE que no expone nada al contexto de pagina, asi
+ * que este harness extrae el <script>, le inyecta un hook de exportacion justo
+ * antes del cierre del IIFE, y lo evalua en un contexto con stubs. El resultado
+ * es el estado y las funciones REALES del juego: se prueba comportamiento, no
+ * una reimplementacion.
+ *
+ * Los stubs son no-ops a proposito: el canvas dibuja a la nada, el audio no
+ * existe (window.AudioContext es undefined), y requestAnimationFrame no agenda
+ * nada. El loop se maneja a mano con update(dt).
+ */
+const fs = require('fs');
+const vm = require('vm');
+const path = require('path');
+
+const HTML_PATH = path.join(__dirname, 'index.html');
+
+function makeCtx(canvasEl){
+  const store = {};
+  const ctxProxy = new Proxy(store, {
+    get(t, k){
+      if (k === 'canvas') return canvasEl;
+      if (k === 'getImageData' || k === 'createImageData')
+        return (x, y, w, h) => ({
+          data: new Uint8ClampedArray(Math.max(1, (w|0) * (h|0) * 4)),
+          width: w|0, height: h|0
+        });
+      if (k === 'measureText') return () => ({ width: 10 });
+      if (k in t) return t[k];
+      // cualquier otro metodo de canvas es un no-op encadenable
+      return () => ctxProxy;
+    },
+    set(t, k, v){ t[k] = v; return true; }
+  });
+  return ctxProxy;
+}
+
+function makeEl(tag){
+  const ctx = makeCtx(null);
+  const el = {
+    tagName: String(tag || 'div').toUpperCase(),
+    style: {}, dataset: {},
+    width: 360, height: 560,
+    innerHTML: '', textContent: '', value: '',
+    classList: { add(){}, remove(){}, toggle(){}, contains(){ return false } },
+    addEventListener(){}, removeEventListener(){}, dispatchEvent(){ return true },
+    appendChild(c){ return c }, removeChild(c){ return c }, remove(){},
+    insertBefore(c){ return c },
+    getBoundingClientRect(){ return { left:0, top:0, width:360, height:560, right:360, bottom:560 }; },
+    getContext(){ return ctx; },
+    setAttribute(){}, removeAttribute(){}, getAttribute(){ return null },
+    querySelector(){ return null }, querySelectorAll(){ return [] },
+    scrollTop: 0, scrollHeight: 0, offsetWidth: 360, offsetHeight: 560,
+    focus(){}, blur(){}, click(){},
+    setPointerCapture(){}, releasePointerCapture(){}, hasPointerCapture(){ return false }
+  };
+  return el;
+}
+
+/**
+ * Construye el juego. Devuelve el hook con el estado y las funciones reales.
+ */
+function buildGame(){
+  const html = fs.readFileSync(HTML_PATH, 'utf8');
+  const m = html.match(/<script>([\s\S]*?)<\/script>/);
+  if (!m) throw new Error('no encontre el <script> en index.html');
+  let src = m[1];
+
+  // Hook de exportacion, inyectado dentro del IIFE justo antes de su cierre.
+  const hook = `
+;globalThis.__G = {
+  get state(){ return state; },
+  get save(){ return save; },
+  update, draw, fire, iniciar, detenerJuego, nuevoEstado,
+  W, H, LX, LY, SELECTOR_Y, LEDGE_Y, FLOOR_Y, GRAV, V0, VEL,
+  POWER_MIN, POWER_MAX, ELEMENT_INFO, ELKEYS, NIVELES,
+  applyHit, addParticles, muzzlePos, vel, cooldownFor,
+  cargaMaxima, powerMult
+};`;
+  const close = src.lastIndexOf('})();');
+  if (close < 0) throw new Error('no encontre el cierre del IIFE');
+  src = src.slice(0, close) + hook + src.slice(close);
+
+  const canvasEl = makeEl('canvas');
+  const els = {
+    c: canvasEl,
+    overlay: makeEl('div'),
+    exitBtn: makeEl('button'),
+    pauseBtn: makeEl('button')
+  };
+
+  const documentStub = {
+    getElementById: (id) => els[id] || (els[id] = makeEl('div')),
+    createElement: (tag) => makeEl(tag),
+    addEventListener(){}, removeEventListener(){},
+    body: makeEl('body'), documentElement: makeEl('html'),
+    hidden: false, visibilityState: 'visible'
+  };
+
+  const windowStub = {
+    devicePixelRatio: 1,
+    addEventListener(){}, removeEventListener(){},
+    AudioContext: undefined, webkitAudioContext: undefined,
+    requestAnimationFrame: () => 1,
+    cancelAnimationFrame(){},
+    innerWidth: 400, innerHeight: 700,
+    location: { href: 'file:///index.html', reload(){} }
+  };
+
+  const sandbox = {
+    window: windowStub,
+    document: documentStub,
+    localStorage: { getItem: () => null, setItem(){}, removeItem(){} },
+    requestAnimationFrame: windowStub.requestAnimationFrame,
+    cancelAnimationFrame(){},
+    performance: { now: () => Date.now() },
+    navigator: { userAgent: 'node' },
+    Math, JSON, Date, console, setTimeout, clearTimeout,
+    Uint8ClampedArray, Array, Object, Number, String, Boolean, Error,
+    isNaN, parseFloat, parseInt
+  };
+  sandbox.globalThis = sandbox;
+  sandbox.window.document = documentStub;
+
+  vm.createContext(sandbox);
+  vm.runInContext(src, sandbox, { filename: 'index.html' });
+  if (!sandbox.__G) throw new Error('el hook de exportacion no se inyecto');
+  return sandbox.__G;
+}
+
+module.exports = { buildGame };
