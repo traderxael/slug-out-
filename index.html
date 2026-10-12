@@ -123,6 +123,7 @@
   const SELECTOR_Y = 490, SELECTOR_H = 70;
   const LX = W/2, LY = SELECTOR_Y - 46;
   const LEDGE_Y = 128, FLOOR_Y = LY + 26;
+  const GRAV_ROCA = 0.0004;   // px/ms^2 — tarda ~1.5s en cruzar la pantalla
 
   // ---------- guardado ----------
   const SAVE_KEY = 'lanzador_cavernas_2_save_v1';
@@ -601,10 +602,10 @@
     ELKEYS.forEach(el=>{ rar[el] = mejorRareza(el); });
     const s = {
       modo:modo, nivel:L||0, idx:0, wave:1, n: modo==='nivel' ? NIVELES[L-1].n : 0,
-      enemy:null, projectiles:[], enemyShots:[], particles:[], bolts:[], drops:[],
+      enemy:null, projectiles:[], enemyShots:[], particles:[], bolts:[], drops:[], rocas:[],
       player:{hp:100,maxHp:100}, selected:equipo[0], equipo:equipo, rar:rar,
       cooldown:0, cooldownMax:480, recoil:0, aimAngle:-Math.PI/2, aimPower:1, waveTransition:0, combo:0, maxCombo:0, comboT:0, score:0, shake:0, flash:0,
-      cofresRun:0, bannerT:2400,
+      cofresRun:0, bannerT:2400, rocaTimer:2600,
       ultiCharge:0, ultiMax:100, ultiFxT:0, eclipseLeft:0,
       bannerText: modo==='nivel' ? 'Nivel '+L : 'Modo infinito',
       bannerSub: modo==='nivel' ? NIVELES[L-1].nombre : 'Aguanta todas las olas que puedas'
@@ -741,6 +742,37 @@
     }
     else if(elKey==='planta'){ curarJugador(Math.max(1, Math.round(dmg*(max?0.22:0.15)))); }
     else if(elKey==='sombra'){ curarJugador(Math.max(1, Math.round(dmg*(max?0.28:0.2)))); addTextParticle(en.x-16, en.y-en.r-30, 'Robo', ELEMENT_INFO.sombra.color, 9); }
+  }
+
+  // Dano que un proyectil hace a una ROCA. Una roca no tiene elemento, asi que
+  // se usa la base del tiro: rareza, potencia y carga maxima. Reusa las mismas
+  // constantes que el dano al rival para que romper una roca cueste lo que
+  // costaria pegarle.
+  function danoDeRoca(p){
+    const pw = (p.power==null || isNaN(p.power)) ? 1 : Math.max(POWER_MIN, Math.min(POWER_MAX, p.power));
+    const rm = RAREZA[p.r].mult;
+    return Math.max(1, Math.round(16*rm*powerMult(pw)*(cargaMaxima(pw)?1.25:1)));
+  }
+
+  // Intervalo entre rocas. Baja con el nivel (o con la ola en modo infinito):
+  // mas adelante el escenario presiona mas seguido.
+  function intervaloRoca(){
+    const L = state.modo === 'nivel' ? state.nivel : state.wave;
+    return Math.max(2200, 5200 - L*320);
+  }
+
+  // Una roca nueva: columna al azar dentro del campo, cerca del techo, y con
+  // `tellT` por delante para que el jugador la lea antes de que caiga. El `wob`
+  // es la fase del temblor que la dibuja durante el tell.
+  function spawnRoca(){
+    const margen = 46;
+    const x = margen + Math.random()*(W - margen*2);
+    state.rocas.push({
+      x:x, y:34, vy:0, r:14 + Math.random()*6,
+      hp:40, maxHp:40, tellT:700, wob:Math.random()*Math.PI*2
+    });
+    addParticles(x, 40, '#a08b6d', 6, 'tierra');
+    beep(300, 0.05, 'triangle', 0.04);      // cue del tell
   }
 
   // ======== HABILIDAD DEFINITIVA ========
@@ -916,6 +948,36 @@
       beep(520, 0.06, 'square', 0.05);      // cue de audio del tell
     }
 
+    // ======== ROCAS: aparecen avisadas y caen ========
+    // El tell convierte el obstaculo en lectura: la roca se marca y tiembla unos
+    // instantes antes de soltarse. Durante ese rato el jugador decide — cambiar
+    // de columna, apurar el tiro, o romper la roca antes de que caiga. Una roca
+    // que cae de la nada no tendria decision, solo suerte.
+    if(state.rocaTimer > 0) state.rocaTimer -= dt;
+    else { state.rocaTimer = intervaloRoca(); spawnRoca(); }
+    for(let k=state.rocas.length-1;k>=0;k--){
+      const ro = state.rocas[k];
+      if(ro.tellT > 0){ ro.tellT -= dt; continue; }   // telegrafiada: marcada y quieta
+      ro.vy += GRAV_ROCA*dt;
+      ro.y += ro.vy*dt;
+      // La roca golpea al jugador al cruzar su linea, igual que los escupitajos
+      // del rival. `golpeo` evita que una misma roca cobre dos veces: pasa una
+      // sola vez, y de ahi en mas solo cae hasta el piso.
+      if(!ro.golpeo && ro.y >= LY-10 && Math.abs(ro.x - LX) < 34){
+        ro.golpeo = true;
+        state.player.hp = Math.max(0, state.player.hp - 12);
+        state.shake = Math.max(state.shake, 8);
+        addParticles(LX, LY-6, '#a08b6d', 12, 'tierra');
+        addTextParticle(LX, LY-30, '-12', '#ff5f6d', 12);
+        sfxHitPlayer();
+      }
+      if(ro.y >= FLOOR_Y - ro.r){
+        ro.y = FLOOR_Y - ro.r;
+        addParticles(ro.x, FLOOR_Y-2, '#a08b6d', 10, 'tierra');
+        state.rocas.splice(k,1);
+      }
+    }
+
     for(let i=state.projectiles.length-1;i>=0;i--){
       const p = state.projectiles[i];
       p.age += dt;
@@ -951,6 +1013,29 @@
         }
       }
       if(blocked){ if(!p.multi){ state.projectiles.splice(i,1); } continue; }
+      // ======== ROCAS: obstaculos que bloquean el tiro ========
+      // Una roca en la columna consume el proyectil y recibe el dano. Disparar
+      // contra una roca es gastar el tiro, asi que la columna libre hay que
+      // elegirla: el escenario pasa a ser un problema de timing, no un pasillo.
+      let chocoRoca = false;
+      for(let k=state.rocas.length-1;k>=0;k--){
+        const ro = state.rocas[k];
+        const rdx = p.x-ro.x, rdy = p.y-ro.y;
+        const rr = ro.r + p.r;
+        if(rdx*rdx + rdy*rdy < rr*rr){
+          ro.hp -= danoDeRoca(p);
+          addParticles(p.x, p.y, '#a08b6d', 8, 'tierra');
+          sfxHit();
+          if(ro.hp<=0){
+            addParticles(ro.x, ro.y, '#a08b6d', 16, 'tierra');
+            addTextParticle(ro.x, ro.y-18, '¡Roca rota!', UI.dim, 10);
+            state.rocas.splice(k,1);
+          }
+          chocoRoca = true;
+          break;
+        }
+      }
+      if(chocoRoca){ if(!p.multi){ state.projectiles.splice(i,1); } continue; }
       if(en.hp<=0) continue;
       const dx=p.x-en.x, dy=p.y-en.y;
       const nx=dx/(en.r*1.4+5), ny=dy/(en.r*0.95+5);
@@ -1335,6 +1420,54 @@
     });
   }
 
+  // Rocas. El tell se dibuja como un marcador que tiembla en el techo sobre la
+  // columna, con la linea de aviso punteada: el jugador LEE por donde va a caer
+  // antes de que caiga. La roca en si muestra grietas a medida que la danan.
+  function drawRocas(){
+    if(!state || !state.rocas) return;
+    for(const ro of state.rocas){
+      if(ro.tellT > 0){
+        const t = 1 - ro.tellT/700;                    // 0 -> 1 mientras avisa
+        const temblor = Math.sin(ro.wob + t*22)*2.4*(0.35+t);
+        const a = 0.28 + 0.42*t;
+        ctx.save();
+        ctx.translate(ro.x + temblor, 24);
+        ctx.fillStyle = rgba('#a08b6d', a);
+        ctx.beginPath(); ctx.moveTo(-7,0); ctx.lineTo(7,0); ctx.lineTo(0,10); ctx.closePath(); ctx.fill();
+        ctx.strokeStyle = rgba('#a08b6d', a*0.32);
+        ctx.lineWidth = 1; ctx.setLineDash([4,5]);
+        ctx.beginPath(); ctx.moveTo(0,9); ctx.lineTo(0,32); ctx.stroke();
+        ctx.setLineDash([]);
+        ctx.restore();
+        continue;
+      }
+      const danada = 1 - ro.hp/ro.maxHp;
+      ctx.save();
+      ctx.translate(ro.x, ro.y);
+      ctx.rotate(ro.wob*0.08 + ro.vy*0.0016);
+      ctx.fillStyle = danada > 0.5 ? '#7d6a52' : '#a08b6d';
+      ctx.beginPath();
+      const n = 7;
+      for(let i=0;i<n;i++){
+        const ang = i/n*Math.PI*2;
+        const rr = ro.r*(0.80 + ((i*37)%10)/26);
+        const px = Math.cos(ang)*rr, py = Math.sin(ang)*rr;
+        if(i===0) ctx.moveTo(px,py); else ctx.lineTo(px,py);
+      }
+      ctx.closePath(); ctx.fill();
+      if(danada > 0){
+        ctx.strokeStyle = 'rgba(20,16,12,'+(0.3+danada*0.45)+')';
+        ctx.lineWidth = 1.2;
+        for(let i=0;i<Math.ceil(danada*3);i++){
+          const ang = ro.wob + i*2.1;
+          ctx.beginPath(); ctx.moveTo(0,0);
+          ctx.lineTo(Math.cos(ang)*ro.r*0.72, Math.sin(ang)*ro.r*0.72);
+          ctx.stroke();
+        }
+      }
+      ctx.restore();
+    }
+  }
   function draw(){
     ctx.save();
     if(state && state.shake>0) ctx.translate((Math.random()-0.5)*state.shake, (Math.random()-0.5)*state.shake);
@@ -1376,6 +1509,7 @@
         ctx.fillText('x'+state.cofresRun, W-54, 28);
       }
       state.enemyShots.forEach(drawEnemyShot);
+      drawRocas();
       state.projectiles.forEach(drawProjectile);
       drawBolts();
       drawParticles();
@@ -1845,6 +1979,7 @@
       +'<p>Arrastra para apuntar y <b>soltá</b> para disparar. Podés interceptar los escupitajos del rival. La barra de arriba del selector carga tu <b>habilidad definitiva</b> con cada acierto.</p>'
       +'<p style="text-align:left;font-size:12px;color:#ffc371;"><b>⚡ Potencia de tiro</b><br>Cuanto más lejos arrastres, más potente es el disparo: más daño y el efecto elemental <b>garantizado</b> a carga máxima (marca MÁX). Pero la recarga se alarga. Espamear tiros flojos o comprometerse a uno pesado es la decisión central.</p>'
       +'<p style="text-align:left;font-size:12px;color:#ff8a6a;"><b>🎯 Esquiva telegrafiada</b><br>El rival <b>avisa</b> antes de esquivar: se agacha y aparece un anillo naranja que se cierra. Durante esa ventana está quieto — si le acertás, la esquiva se <b>CANCELA</b> (¡INTERRUMPIDO!) y queda aturdido. Un tiro <b>pesado</b> llega antes de que complete la esquiva; uno flojo llega tarde y ya se movió. Más carga = más fiable contra la evasión.</p>'
+      +'<p style="text-align:left;font-size:12px;color:#c9a86a;"><b>🪨 Rocas que caen</b><br>El techo suelta rocas. Antes de caer se marcan con un triángulo que tiembla sobre la columna: <b>leé por dónde va a caer</b> y elegí. Una roca en el camino <b>consume tu tiro</b> (se rompe a los pocos golpes), y si cae por tu columna <b>te golpea</b>. Cambiá de columna, apurá el tiro, o rompela antes de que caiga.</p>'
       +'<p style="text-align:left;font-size:12px;color:#6ad4ff;"><b>Teclado (PC)</b><br>← → apuntar · ↑ ↓ potencia · Espacio disparar · 1-8 elemento · U ULTI · P pausa · M sonido · R reiniciar</p>'
       +'<p style="text-align:left;font-size:11px;">'+ventajas+'</p>'
       +'<p style="text-align:left;font-size:11px;">'+habil+'</p>'

@@ -76,6 +76,24 @@ sin errores, y el anillo no se dibujaba jamás en juego normal — un error de s
 deja una feature muerta sin avisar. Corregido a `if(p.vy>=0) continue` y
 `dy = p.y - en.y`.
 
+## 🪨 Rocas que caen: el escenario pasa a ser un problema de timing
+
+El techo suelta rocas. Antes de caer se marcan con un triángulo que tiembla sobre
+la columna, con la línea de aviso punteada: **el obstáculo se lee, no se adivina**.
+
+| Qué hacés | Qué pasa |
+|---|---|
+| Disparás por una columna con roca | La roca **consume el tiro** y recibe el daño; a los pocos golpes se rompe |
+| La roca cae por tu columna | Te **golpea** al cruzar tu línea (−12 de vida) |
+| Leés el tell y cambiás de columna | El tiro llega limpio al rival |
+
+El intervalo entre rocas baja con el nivel (`5200 − nivel*320`, mínimo `2200 ms`),
+así que más adelante el escenario presiona más seguido. Una roca tarda ~1.5 s en
+cruzar la pantalla y aguanta 40 de daño base.
+
+Lo que agrega esto no es contenido: es una decisión más por tiro. Antes la única
+pregunta era *cuánto cargo*; ahora es *cuánto cargo* y *por dónde*.
+
 ## ⚔️ Elementos
 
 | Elemento | Habilidad | ULTI |
@@ -107,7 +125,10 @@ procedural (Canvas 2D) y el audio es sintetizado (Web Audio API).
 
 ## ✅ Verificación
 
-Dos suites que corren contra el `index.html` real, sin servidor:
+Suites Node que corren contra el `index.html` real, sin servidor. `harness.cjs`
+extrae el `<script>`, le inyecta un hook de exportación dentro del IIFE y lo
+evalúa en Node con el DOM y el audio stubeados: se prueba el **comportamiento**
+del juego (estado, colisiones, daño), no una reimplementación.
 
 ```bash
 # 1. Balance y tradeoffs: extrae las funciones de potencia DEL archivo y las ejecuta
@@ -116,16 +137,29 @@ node test-potencia.cjs
 # 2. El tradeoff carga-vs-evasion, por CALCULO con las constantes reales del archivo
 node test-esquiva-balance.cjs
 
-# 3. Juego real en Edge headless: mide la fisica por pixels y ejercita los controles
+# 3-6. Obstaculos (rocas), contra el juego real via harness.cjs
+node test-obstaculos.cjs              # la roca bloquea el tiro y recibe el dano
+node test-obstaculos-caida.cjs        # la roca cae, acelera y se deshace en el piso
+node test-obstaculos-spawn.cjs        # aparecen solas y telegrafiadas antes de caer
+node test-obstaculos-amenaza.cjs      # la roca golpea al jugador solo en su columna
+
+# 7. Juego real en Edge headless: mide la fisica por pixels y ejercita los controles
 "C:/Users/USUARIO/AppData/Local/Programs/Python/Python312/python.exe" qa-juego.py
 
-# 4. La esquiva telegrafiada EN JUEGO: control sin evasion, el tell visible
-#    como anillo, y la tasa de acierto por potencia
+# 8. La esquiva telegrafiada EN JUEGO: control sin evasion, el tell visible como anillo
 "C:/Users/USUARIO/AppData/Local/Programs/Python/Python312/python.exe" test-esquiva.py
 
-# 5. El juego YA PUBLICADO, cargado desde la URL de produccion
+# 9. Las rocas EN JUEGO: que el tell y la roca se VEAN (delta contra la linea base)
+"C:/Users/USUARIO/AppData/Local/Programs/Python/Python312/python.exe" test-obstaculos-visual.py
+
+# 10. El juego YA PUBLICADO, cargado desde la URL de produccion
 "C:/Users/USUARIO/AppData/Local/Programs/Python/Python312/python.exe" qa-live.py
 ```
+
+Las suites 3-6 se escribieron **primero que el código** (TDD): cada una se vio
+fallar por el motivo correcto antes de implementar. La 9 mide el **delta** contra
+la línea base porque la cornisa y el fondo ya son marrones y suman píxeles aunque
+no haya ninguna roca: medir absolutos habría dado un falso positivo.
 
 La suite 2 mide, entre otras cosas, que un tiro a potencia baja se detiene en `y≈368`
 y uno a potencia máxima en `y≈280` del canvas (predicción teórica: 375 y 287), que el
