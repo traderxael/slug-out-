@@ -136,6 +136,30 @@ carga — aturdir tiene recompensa.
 Con rocas y arquetipos, cada tiro ahora se decide por *cuánto cargo*, *por dónde*
 y *contra quién* — y además hay que leer *qué* te va a largar.
 
+## 📖 La mini historia de campana
+
+Doce niveles son doce combates sueltos. La mini historia es lo que los vuelve un
+viaje: **un fragmento corto tras cada combate ganado**, contado en primera persona,
+que avanza con el elemento del nivel.
+
+El arco, en una línea: *las fuentes de la cueva se secaron, los guardianes que
+quedan intentan conservar lo último de su elemento, y en el fondo alguien los
+está juntando.*
+
+| Nivel | Fragmento |
+|---|---|
+| 1 · Umbral | **La última fuente secó** — "Las fuentes de la cueva cantaban. Ahora son piedra seca." |
+| 3 · Veta de roca | **No piden permiso** — "No hay que esquivarlos: hay que decidir cuándo tirar." |
+| 6 · Guardián de escarcha | **El primero que no era basura** — el jefe no ataca al verte: espera que decidas. |
+| 8 · Velo de sombras | **Lo que se lleva la sombra** — la sombra drena, y alguien junta los elementos. |
+| 12 · Corazón de la cueva | **La verdad** — no hay un monstruo: hay un rey que selló los elementos, y tiene razón. |
+
+El fragmento se puede **saltar**; la campana sigue igual. Solo aparece al *avanzar*
+— repetir un nivel o volver a Niveles va directo, porque no estás avanzando el viaje.
+
+Cada fragmento se pinta con el color del elemento del nivel, así que la historia
+se lee con el mismo lenguaje que el combate.
+
 ## ⚔️ Elementos
 
 | Elemento | Habilidad | ULTI |
@@ -215,7 +239,14 @@ node test-habilidades-visual.cjs
 # 23. End-to-end en Edge real: salen solas jugando y se ven por su color
 "C:/Users/USUARIO/AppData/Local/Programs/Python/Python312/python.exe" test-habilidades-browser.py
 
-# 24. El juego YA PUBLICADO, cargado desde la URL de produccion
+# 24-25. Mini historia: datos del arco y el flujo completo con clics simulados
+#         (victoria -> historia -> siguiente nivel, y repetir NO muestra historia)
+node test-historia.cjs
+
+# 26. End-to-end en Edge real: GANAR de verdad el nivel 1 y leer la historia
+"C:/Users/USUARIO/AppData/Local/Programs/Python/Python312/python.exe" test-historia-browser.py
+
+# 27. El juego YA PUBLICADO, cargado desde la URL de produccion
 "C:/Users/USUARIO/AppData/Local/Programs/Python/Python312/python.exe" qa-live.py
 ```
 
@@ -225,7 +256,7 @@ La suite 15 no cuenta píxeles: usa el modo de grabación del harness
 escudo cian `(127,212,255)` y el proyectil de hielo `#6fd6e6` son casi el mismo
 tono: un conteo por color habría dado un falso positivo permanente.
 
-Las suites 3-6, 10-15 y 17-22 se escribieron **primero que el código** (TDD): cada una se
+Las suites 3-6, 10-15, 17-22 y 24 se escribieron **primero que el código** (TDD): cada una se
 vio fallar por el motivo correcto antes de implementar. La 9 mide el **delta**
 contra la línea base porque la cornisa y el fondo ya son marrones y suman píxeles
 aunque no haya ninguna roca: medir absolutos habría dado un falso positivo.

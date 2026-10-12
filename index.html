@@ -40,6 +40,15 @@
   .nm{font-size:10px;margin-top:2px;}
   .pop{animation:pop .45s ease-out both;}
   @keyframes pop{from{opacity:0;transform:scale(.7);}to{opacity:1;transform:scale(1);}}
+  /* ---------- mini historia de campana ---------- */
+  /* No es una pantalla de estadisticas: es una pausa para leer. Mas aire, texto
+     mas grande y alineado a la izquierda, y el color del elemento del nivel para
+     que el pedazo de historia se lea con el mismo lenguaje que el combate. */
+  .hist{display:flex;flex-direction:column;align-items:center;gap:13px;width:100%;animation:pop .5s ease-out both;}
+  .histTag{font-size:10px;letter-spacing:2.5px;text-transform:uppercase;opacity:.8;font-weight:600;}
+  .histLinea{width:34px;height:2px;border-radius:2px;opacity:.5;}
+  .histTit{font-size:21px;font-weight:600;line-height:1.2;max-width:300px;}
+  .histP{margin:0;font-size:14.5px;color:var(--dim);max-width:288px;line-height:1.85;text-align:left;}
 </style>
 </head>
 <body>
@@ -119,6 +128,38 @@
     {nombre:'Corazón de la cueva', n:7, pool:ELKEYS,                                  cofre:'dorado'}
   ];
   const FREQS = {fuego:330, agua:392, tierra:262, aire:494, hielo:440, rayo:587, planta:349, sombra:233};
+
+  // ---------- mini historia de campana ----------
+  // Un fragmento corto tras cada combate. No cuenta la trama de un tiron: cuenta
+  // el mundo y al protagonista, para que cada nivel signifique algo y el arco se
+  // lea igual que el elemento de cada nivel (fuego que seca, hielo que conserva,
+  // sombra que drena...). TDD: ver test-historia.cjs.
+  const HISTORIA = {
+    1:{titulo:'La última fuente secó',
+       texto:'Las fuentes de la cueva cantaban. Ahora son piedra seca. Los que quedamos cargamos el elemento a pulso.'},
+    2:{titulo:'Todavía llora',
+       texto:'El agua ya no cae: gotea. Cada gota la pelean tres. Aprendí a llegar antes que ellos, y a no mirar atrás.'},
+    3:{titulo:'No piden permiso',
+       texto:'Los guardianes de roca no hablan. Se plantan y esperan a que te canses. No hay que esquivarlos: hay que decidir cuándo tirar.'},
+    4:{titulo:'Las raíces recuerdan',
+       texto:'Aquí hubo verde, y las raíces no lo olvidan. Se molestan cuando alguien baja a recordárselo.'},
+    5:{titulo:'El frío guarda lo que queda',
+       texto:'El hielo no destruye: conserva. Eso entendí en la cámara, cuando el frío me dejó las manos duras y la cabeza clara.'},
+    6:{titulo:'El primero que no era basura',
+       texto:'El guardián de escarcha no me atacó al verme. Me miró, cargó el hielo y esperó a que yo decidiera. Fue el primero que me trató como a alguien.'},
+    7:{titulo:'Chispas en la oscuridad',
+       texto:'El nido de centellas no duerme. Cada chispa es un guardián chico probando si sirvo para esto.'},
+    8:{titulo:'Lo que se lleva la sombra',
+       texto:'La sombra no pelea: drena. Le vi quitarle el aire a un guardián y quedarse con su color. Algo está juntando los elementos, y no es para protegerlos.'},
+    9:{titulo:'El fuego que no calienta',
+       texto:'Ardía sin dar calor. Un fuego vacío, como una promesa que nadie cumplió: ya no quedaba nadie a quien calentar.'},
+    10:{titulo:'Los ecos del pasado',
+        texto:'El laberinto repite cada paso que doy. Los ecos ya sabían que iba a llegar: los habían oído antes, a otros.'},
+    11:{titulo:'La corriente que viene de abajo',
+        texto:'El rayo no cae del cielo. Sube. Algo abajo lo empuja, y ese algo tiene prisa.'},
+    12:{titulo:'La verdad',
+        texto:'En el corazón de la cueva no hay un monstruo. Hay un rey que selló los ocho elementos para que nadie los peleara nunca más. Yo traigo ocho, y él tiene razón: cada uno que libero enciende una guerra. Pero la cueva ya está muerta, y una cueva viva vale más que una cueva en paz.'}
+  };
 
   const SELECTOR_Y = 490, SELECTOR_H = 70;
   const LX = W/2, LY = SELECTOR_Y - 46;
@@ -562,6 +603,30 @@
   function showOverlay(html){ overlayEl.innerHTML = '<div class="col">'+html+'</div>'; overlayEl.style.display = 'flex'; overlayEl.scrollTop = 0; }
   function hideOverlay(){ overlayEl.style.display = 'none'; }
   function bind(id, fn){ const e = document.getElementById(id); if(e) e.addEventListener('click', fn); }
+
+  // El pedazo de historia que aparece tras cada combate de campana, como puente
+  // hacia el nivel siguiente. Se puede saltar: la campana sigue igual. Sin
+  // fragmento para ese nivel, la continuacion corre derecho.
+  function mostrarHistoria(L, continuar){
+    const h = HISTORIA[L];
+    if(!h || typeof continuar !== 'function'){ if(continuar) continuar(); return; }
+    const nv  = NIVELES[L-1];
+    const col = (nv && nv.pool && nv.pool.length) ? ELEMENT_INFO[nv.pool[0]].color : '#6ad4ff';
+    const fin = L >= NIVELES.length;
+    showOverlay(
+        '<div class="hist">'
+      +   '<div class="histTag" style="color:'+col+'">Nivel '+L+' · '+nv.nombre+'</div>'
+      +   '<div class="histLinea" style="background:'+col+'"></div>'
+      +   '<h2 class="histTit" style="color:'+col+'">'+h.titulo+'</h2>'
+      +   '<p class="histP">'+h.texto+'</p>'
+      +   '<div class="fila" style="margin-top:8px">'
+      +     '<button class="btn btnAlt btnS" id="btnSaltarHist">Saltar</button>'
+      +     '<button class="btn" id="btnSeguirHist">'+(fin?'Cerrar':'Continuar')+'</button>'
+      +   '</div>'
+      + '</div>');
+    bind('btnSaltarHist', ()=>{ hideOverlay(); continuar(); });
+    bind('btnSeguirHist',  ()=>{ hideOverlay(); continuar(); });
+  }
   function drawHpBar(x,y,w,h,val,max,color){
     ctx.fillStyle = 'rgba(255,255,255,.08)'; ctx.fillRect(x,y,w,h);
     ctx.fillStyle = color; ctx.fillRect(x,y,w*Math.max(0,val/max),h);
@@ -2035,7 +2100,12 @@
         +'<button class="btn btnAlt" id="btnNiveles">Niveles</button>'
       );
       bind('btnAbrirCofres', renderCofres);
-      bind('btnSiguiente', ()=>iniciar('nivel', L+1));
+      // Avanzar SI pasa por la mini historia: es el puente entre combates.
+      // Repetir y volver a Niveles van directo, porque no estas avanzando el viaje.
+      bind('btnSiguiente', ()=>mostrarHistoria(L, ()=>{
+        if(L < NIVELES.length) iniciar('nivel', L+1);
+        else renderNiveles();
+      }));
       bind('btnRepetir', ()=>iniciar('nivel', L));
       bind('btnNiveles', renderNiveles);
     }, 500);
@@ -2320,6 +2390,7 @@
       +'<p style="text-align:left;font-size:12px;color:#c9a86a;"><b>🪨 Rocas que caen</b><br>El techo suelta rocas. Antes de caer se marcan con un triángulo que tiembla sobre la columna: <b>leé por dónde va a caer</b> y elegí. Una roca en el camino <b>consume tu tiro</b> (se rompe a los pocos golpes), y si cae por tu columna <b>te golpea</b>. Cambiá de columna, apurá el tiro, o rompela antes de que caiga.</p>'
       +'<p style="text-align:left;font-size:12px;color:#7fd4ff;"><b>🛡️ Enemigos con comportamiento</b><br>No todos son iguales, y cada uno te obliga a responder distinto:<br>· <b>Escudado</b> (nivel 4+): levanta un escudo que <b>absorbe tu tiro</b>. El anillo cian se cierra antes de subir: esperá a que baje, cambiá de elemento, o gastá el tiro a propósito.<br>· <b>Saltarín</b> (nivel 7+): se agacha y <b>salta</b>. Leé la altura antes de tirar.<br>· <b>Frenético</b> (todos los jefes): al bajar de la mitad de la vida <b>se enfurece</b> — aura roja, se mueve más rápido y ataca más seguido. Bajalo de golpe o bancate la andanada.</p>'
       +'<p style="text-align:left;font-size:12px;color:#b9a6e8;"><b>🎨 La habilidad de su elemento</b><br>Cada villano usa contra vos <b>la habilidad de SU elemento</b>, igual que tus babosas. El anillo de carga se pinta del color del elemento, así que <b>leés cuál viene</b> antes de que salga:<br>· <b>🔥 Fuego</b>: charco ardiente bajo tus pies que te quema<br>· <b>💧 Agua</b>: marea que te alarga la recarga<br>· <b>🪨 Tierra</b>: te aturde — no disparás, pero conservás la carga<br>· <b>🌪️ Aire</b>: abanico de 3 tiros perforantes<br>· <b>❄️ Hielo</b>: te congela — no disparás <b>y te baja la carga</b><br>· <b>⚡ Rayo</b>: descarga doble, el primero avisa el segundo<br>· <b>🌿 Planta</b>: se regenera y te enreda<br>· <b>🌑 Sombra</b>: te roba vida y se cura con ella</p>'
+      +'<p style="text-align:left;font-size:12px;color:#b9a6e8;"><b>📖 La historia de la campana</b><br>Tras cada combate ganado, un pedazo de historia cuenta qué pasa en la cueva y por qué la estás recorriendo. El arco se lee con los elementos: el fuego que seca, el hielo que conserva, la sombra que drena. Si no te interesa, <b>Saltar</b> y listo.</p>'
       +'<p style="text-align:left;font-size:12px;color:#6ad4ff;"><b>Teclado (PC)</b><br>← → apuntar · ↑ ↓ potencia · Espacio disparar · 1-8 elemento · U ULTI · P pausa · M sonido · R reiniciar</p>'
       +'<p style="text-align:left;font-size:11px;">'+ventajas+'</p>'
       +'<p style="text-align:left;font-size:11px;">'+habil+'</p>'
