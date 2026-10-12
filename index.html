@@ -124,6 +124,19 @@
   const LX = W/2, LY = SELECTOR_Y - 46;
   const LEDGE_Y = 128, FLOOR_Y = LY + 26;
   const GRAV_ROCA = 0.0004;   // px/ms^2 — tarda ~1.5s en cruzar la pantalla
+  // ---------- arquetipos de enemigo ----------
+  // Cada arquetipo obliga a una respuesta distinta: no es mas contenido, es una
+  // decision mas por tiro.
+  const ESC_DUR = 900;        // ms que el escudo del escudado absorbe tiros
+  const ESC_CD  = 2600;       // ms entre escudo y escudo
+  const ESC_TELL = 480;       // ms de aviso antes de que suba (se lee, no se adivina)
+  const SALTO_V = 0.30;       // px/ms de impulso del saltarin (NEGATIVO = hacia arriba)
+  const SALTO_CD = 2200;      // ms entre saltos
+  const SALTO_TELL = 260;     // ms de agachada antes de saltar: el salto se lee
+  const GRAV_SALTO = 0.0008;  // px/ms^2 — vuelve en ~750ms, apogeo ~56px
+  const FURIA_HP = 0.5;       // por debajo de esta fraccion el frenetico se enfurece
+  const FURIA_SPD = 1.40;     // multiplicador de velocidad enfurecido
+  const FURIA_ATK = 0.65;     // multiplicador del intervalo de ataque enfurecido
 
   // ---------- guardado ----------
   const SAVE_KEY = 'lanzador_cavernas_2_save_v1';
@@ -560,14 +573,17 @@
     const r = o.boss ? 30 : 24;
     return {
       hp:o.hp, maxHp:o.hp, boss:o.boss, r:r,
-      x:W/2, y:LEDGE_Y-0.78*r, vx:o.vx, dir: Math.random()<0.5?1:-1,
+      x:W/2, y:LEDGE_Y-0.78*r, sueloY:LEDGE_Y-0.78*r, vx:o.vx, dir: Math.random()<0.5?1:-1,
       pool:o.pool, tipo:o.pool[Math.floor(Math.random()*o.pool.length)],
       atkTimer:0, atkInterval:o.atkInterval, atkDamage:o.atkDamage,
       rafaga:o.rafaga||1, burstLeft:0, burstTimer:0,
       burnTicks:0, burnDamage:0, burnTimer:0, slowLeft:0, freezeLeft:0,
       cycles:o.boss, cycleTimer:0, phase:0, hitT:0,
       dodgeCd:0, dodgeT:0, dodgeWindup:0, dodgeWindupMax:200, dodgeVx:0,
-      stunT:0, evasion:o.evasion||0
+      stunT:0, evasion:o.evasion||0,
+      arquetipo:o.arquetipo||'normal',
+      escOn:false, escT:0, escCd:o.escCd||ESC_CD, escWindup:0,
+      saltoV:0, aire:false, saltoT:0, saltoWindup:0, furia:false
     };
   }
   function statsNivel(L){
@@ -575,6 +591,14 @@
       hpMul: 1+0.40*(L-1), dmgMul: 1+0.19*(L-1), intMul: Math.max(0.5, 1-0.055*(L-1)),
       spdMul: 1+0.07*(L-1), rafaga: L>=10 ? 3 : (L>=5 ? 2 : 1), evasion: Math.min(0.42, (L-2)*0.06)
     };
+  }
+  // Asignacion de arquetipo: se introducen por nivel para que el jugador los
+  // aprenda de a uno, no se los tiren todos juntos desde el nivel 1.
+  function arquetipoDe(L, idx, boss){
+    if(boss) return 'frenetico';
+    if(L>=7 && idx%3===2) return 'saltarin';
+    if(L>=4 && idx%3===1) return 'escudado';
+    return 'normal';
   }
   function enemigoNivel(L, idx){
     const cfg = NIVELES[L-1], st = statsNivel(L), boss = idx===cfg.n-1;
@@ -584,8 +608,16 @@
       atkInterval: Math.max(1300, 3300*st.intMul-idx*40)*(boss?1.12:1),
       atkDamage: 8*st.dmgMul*(boss?1.15:1),
       rafaga: boss ? Math.min(3, st.rafaga+(L>=3?1:0)) : st.rafaga,
-      evasion: boss ? Math.min(0.5, st.evasion+0.1) : st.evasion
+      evasion: boss ? Math.min(0.5, st.evasion+0.1) : st.evasion,
+      arquetipo: arquetipoDe(L, idx, boss)
     });
+  }
+  // Mismo criterio en modo infinito: aparecen por oleada, de a uno.
+  function arquetipoInfinito(wave){
+    if(wave%5===0) return 'frenetico';
+    if(wave>=10 && wave%3===1) return 'saltarin';
+    if(wave>=6  && wave%3===2) return 'escudado';
+    return 'normal';
   }
   function enemigoInfinito(wave){
     const boss = wave%5===0;
@@ -593,7 +625,8 @@
       hp: Math.round((60+wave*18)*(boss?1.4:1)), boss:boss,
       vx: Math.min(0.14, (40+wave*3)/1000), pool:ELKEYS,
       atkInterval: Math.max(1600, 3400-wave*80), atkDamage: 6+wave*1.3, rafaga:1,
-      evasion: Math.min(0.4, wave*0.025)
+      evasion: Math.min(0.4, wave*0.025),
+      arquetipo: arquetipoInfinito(wave)
     });
   }
   function nuevoEstado(modo, L){
@@ -707,6 +740,16 @@
     const eclipseMult = state.eclipseLeft>0 ? 3 : 1;
     const dmg = Math.round(16*mult*comboMult*critMult*rm*eclipseMult*powerMult(pw)*(max?1.25:1));
     en.hp = Math.max(0, en.hp-dmg);
+    // El frenetico se enfurece al cruzar la mitad de la vida: el combate cambia
+    // de ritmo justo cuando el jugador cree que lo tiene controlado. Es una
+    // decision de tempo — bajarlo de golpe o bancarse la andanada.
+    if(en.arquetipo==='frenetico' && !en.furia && en.hp>0 && en.hp <= en.maxHp*FURIA_HP){
+      en.furia = true;
+      addTextParticle(en.x, en.y-en.r-30, '¡FURIA!', '#ff5f6d', 13);
+      addParticles(en.x, en.y, '#ff5f6d', 16, 'rayo');
+      state.shake = Math.max(state.shake, 8);
+      beep(140, 0.14, 'sawtooth', 0.1);
+    }
     en.hitT = 140;
     state.score += dmg;
     state.ultiCharge = Math.min(state.ultiMax, state.ultiCharge + dmg*0.5);
@@ -1040,6 +1083,17 @@
       const dx=p.x-en.x, dy=p.y-en.y;
       const nx=dx/(en.r*1.4+5), ny=dy/(en.r*0.95+5);
       if(nx*nx+ny*ny<1){
+        // El ESCUDADO absorbe el tiro: el proyectil se destruye y no hay daño.
+        // El escudo sube telegrafiado (escWindup), asi que esto se lee y se
+        // espera: disparar contra el escudo es gastar el tiro a proposito.
+        if(en.arquetipo==='escudado' && en.escOn){
+          en.escOn = false; en.escCd = ESC_CD;
+          addTextParticle(en.x, en.y-en.r-30, '¡ESCUDO!', '#7fd4ff', 11);
+          addParticles(en.x, en.y, '#7fd4ff', 14, 'escudo');
+          beep(320, 0.07, 'square', 0.08);
+          state.projectiles.splice(i,1);
+          continue;
+        }
         // Acertar durante el "viento" o el movimiento de esquiva lo CANCELA:
         // el tiro pega (en vez de fallar) y el rival queda aturdido. Este es el
         // castigo que convierte el azar en lectura.
@@ -1063,9 +1117,52 @@
     } else {
       // Durante el "viento" de la esquiva el rival se QUEDA QUIETO: el tell
       // tiene que ser legible y la ventana de castigo, justa.
-      if(en.dodgeT<=0 && en.dodgeWindup<=0 && en.stunT<=0) en.x += en.vx*en.dir*dt;
+      if(en.dodgeT<=0 && en.dodgeWindup<=0 && en.stunT<=0)
+        en.x += en.vx*(en.furia?FURIA_SPD:1)*en.dir*dt;
       if(en.x<50){ en.x=50; en.dir=1; if(en.dodgeT>0) en.dodgeVx = Math.abs(en.dodgeVx); }
       if(en.x>W-50){ en.x=W-50; en.dir=-1; if(en.dodgeT>0) en.dodgeVx = -Math.abs(en.dodgeVx); }
+    }
+
+    // ---------- arquetipos: comportamientos autonomos ----------
+    // Cada uno corre solo y AVISA antes de actuar: son un ritmo que se lee, no
+    // una sorpresa. El escudado baja el escudo, avisa ESC_TELL ms y lo sube.
+    if(en.arquetipo==='escudado' && en.stunT<=0){
+      if(en.escOn){
+        en.escT -= dt;
+        if(en.escT<=0){ en.escOn=false; en.escCd = ESC_CD; }
+      } else if(en.escWindup>0){
+        en.escWindup -= dt;
+        if(en.escWindup<=0){
+          en.escOn = true; en.escT = ESC_DUR;
+          beep(520, 0.06, 'triangle', 0.07);
+        }
+      } else {
+        en.escCd -= dt;
+        if(en.escCd<=0) en.escWindup = ESC_TELL;
+      }
+    }
+    // El saltarin se agacha SALTO_TELL ms (se lee) y salta. y crece hacia abajo,
+    // asi que el impulso es NEGATIVO y la gravedad SUMA: invertir cualquiera de
+    // los dos signos lo hunde en el piso sin dar error.
+    if(en.arquetipo==='saltarin' && en.stunT<=0){
+      if(en.aire){
+        en.saltoV += GRAV_SALTO*dt;
+        en.y += en.saltoV*dt;
+        if(en.y >= en.sueloY){
+          en.y = en.sueloY; en.aire = false; en.saltoV = 0; en.saltoT = SALTO_CD;
+          addParticles(en.x, en.sueloY+8, '#b9c6d6', 6, 'polvo');
+          beep(180, 0.05, 'sine', 0.06);
+        }
+      } else if(en.saltoWindup>0){
+        en.saltoWindup -= dt;
+        if(en.saltoWindup<=0){
+          en.aire = true; en.saltoV = -SALTO_V;
+          beep(420, 0.06, 'triangle', 0.07);
+        }
+      } else {
+        en.saltoT -= dt;
+        if(en.saltoT<=0) en.saltoWindup = SALTO_TELL;
+      }
     }
     if(en.burnTicks>0){
       en.burnTimer += dt;
@@ -1091,7 +1188,7 @@
       }
     }
     if(en.hp>0 && !congelado){
-      const interval = en.atkInterval*(en.slowLeft>0?1.6:1);
+      const interval = en.atkInterval*(en.slowLeft>0?1.6:1)*(en.furia?FURIA_ATK:1);
       en.atkTimer += dt;
       if(en.atkTimer>=interval){
         en.atkTimer = 0;
@@ -1194,6 +1291,45 @@
     if(pct>0.02){
       ctx.strokeStyle = pct>0.8 ? '#c96b5a' : 'rgba(234,234,234,.5)';
       ctx.beginPath(); ctx.ellipse(en.x,en.y,en.r*1.5+8,en.r+8,0,-Math.PI/2,-Math.PI/2+pct*Math.PI*2); ctx.stroke();
+    }
+    // ---------- arquetipos: lo que se VE de cada uno ----------
+    // Los tres se LEEN: el escudo con su anillo que se cierra, la agachada antes
+    // de saltar, el aura roja enfurecido. Si no se vieran serian mecanicas
+    // invisibles y el jugador no tendria nada que decidir.
+    if(en.arquetipo==='escudado'){
+      if(en.escWindup>0){
+        // tell: el anillo se cierra mientras el escudo esta por subir
+        const t = 1 - en.escWindup/ESC_TELL;
+        ctx.save(); ctx.lineWidth = 2.5;
+        ctx.strokeStyle = 'rgba(127,212,255,'+(0.30+0.45*t)+')';
+        ctx.beginPath();
+        ctx.ellipse(en.x,en.y,en.r*1.55+14,en.r+14,0,-Math.PI/2,-Math.PI/2+t*Math.PI*2);
+        ctx.stroke(); ctx.restore();
+      } else if(en.escOn){
+        ctx.save();
+        ctx.fillStyle = 'rgba(127,212,255,.12)';
+        ctx.strokeStyle = 'rgba(127,212,255,.85)'; ctx.lineWidth = 3;
+        ctx.beginPath(); ctx.ellipse(en.x,en.y,en.r*1.55+10,en.r*1.15+10,0,0,Math.PI*2);
+        ctx.fill(); ctx.stroke(); ctx.restore();
+      }
+    }
+    if(en.arquetipo==='saltarin' && en.saltoWindup>0){
+      // agachada: el cuerpo se achata justo antes de saltar
+      const t = 1 - en.saltoWindup/SALTO_TELL;
+      ctx.save(); ctx.lineWidth = 2;
+      ctx.strokeStyle = 'rgba(185,198,214,'+(0.30+0.40*t)+')';
+      ctx.beginPath();
+      ctx.ellipse(en.x, en.y+en.r*0.55, en.r*(1.35-0.25*t), en.r*0.42, 0, 0, Math.PI*2);
+      ctx.stroke(); ctx.restore();
+    }
+    if(en.furia){
+      // aura roja que late: dice "cambio de ritmo" sin texto
+      const pulso = 0.5+0.5*Math.sin(Date.now()/95);
+      ctx.save(); ctx.lineWidth = 2.5;
+      ctx.strokeStyle = 'rgba(255,95,109,'+(0.40+0.40*pulso)+')';
+      ctx.beginPath();
+      ctx.ellipse(en.x,en.y,en.r*1.6+4+pulso*4,en.r*1.2+4+pulso*4,0,0,Math.PI*2);
+      ctx.stroke(); ctx.restore();
     }
     ctx.restore();
   }
@@ -1980,6 +2116,7 @@
       +'<p style="text-align:left;font-size:12px;color:#ffc371;"><b>⚡ Potencia de tiro</b><br>Cuanto más lejos arrastres, más potente es el disparo: más daño y el efecto elemental <b>garantizado</b> a carga máxima (marca MÁX). Pero la recarga se alarga. Espamear tiros flojos o comprometerse a uno pesado es la decisión central.</p>'
       +'<p style="text-align:left;font-size:12px;color:#ff8a6a;"><b>🎯 Esquiva telegrafiada</b><br>El rival <b>avisa</b> antes de esquivar: se agacha y aparece un anillo naranja que se cierra. Durante esa ventana está quieto — si le acertás, la esquiva se <b>CANCELA</b> (¡INTERRUMPIDO!) y queda aturdido. Un tiro <b>pesado</b> llega antes de que complete la esquiva; uno flojo llega tarde y ya se movió. Más carga = más fiable contra la evasión.</p>'
       +'<p style="text-align:left;font-size:12px;color:#c9a86a;"><b>🪨 Rocas que caen</b><br>El techo suelta rocas. Antes de caer se marcan con un triángulo que tiembla sobre la columna: <b>leé por dónde va a caer</b> y elegí. Una roca en el camino <b>consume tu tiro</b> (se rompe a los pocos golpes), y si cae por tu columna <b>te golpea</b>. Cambiá de columna, apurá el tiro, o rompela antes de que caiga.</p>'
+      +'<p style="text-align:left;font-size:12px;color:#7fd4ff;"><b>🛡️ Enemigos con comportamiento</b><br>No todos son iguales, y cada uno te obliga a responder distinto:<br>· <b>Escudado</b> (nivel 4+): levanta un escudo que <b>absorbe tu tiro</b>. El anillo cian se cierra antes de subir: esperá a que baje, cambiá de elemento, o gastá el tiro a propósito.<br>· <b>Saltarín</b> (nivel 7+): se agacha y <b>salta</b>. Leé la altura antes de tirar.<br>· <b>Frenético</b> (todos los jefes): al bajar de la mitad de la vida <b>se enfurece</b> — aura roja, se mueve más rápido y ataca más seguido. Bajalo de golpe o bancate la andanada.</p>'
       +'<p style="text-align:left;font-size:12px;color:#6ad4ff;"><b>Teclado (PC)</b><br>← → apuntar · ↑ ↓ potencia · Espacio disparar · 1-8 elemento · U ULTI · P pausa · M sonido · R reiniciar</p>'
       +'<p style="text-align:left;font-size:11px;">'+ventajas+'</p>'
       +'<p style="text-align:left;font-size:11px;">'+habil+'</p>'

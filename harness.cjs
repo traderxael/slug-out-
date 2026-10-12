@@ -17,7 +17,7 @@ const path = require('path');
 
 const HTML_PATH = path.join(__dirname, 'index.html');
 
-function makeCtx(canvasEl){
+function makeCtx(canvasEl, rec){
   const store = {};
   const ctxProxy = new Proxy(store, {
     get(t, k){
@@ -28,6 +28,23 @@ function makeCtx(canvasEl){
           width: w|0, height: h|0
         });
       if (k === 'measureText') return () => ({ width: 10 });
+      // Modo grabacion: cada stroke()/fill() anota el estilo vigente. Sirve para
+      // verificar QUE se dibuja y de que color sin adivinar por pixels, algo
+      // imposible cuando dos entidades comparten tono: el escudo cian
+      // (127,212,255) y el proyectil de hielo (#6fd6e6) son casi el mismo color,
+      // y contarlos juntos daria un falso positivo permanente.
+      if (rec && (k === 'stroke' || k === 'fill')){
+        return () => {
+          // Solo los estilos cadena son comparables: un gradiente llega como
+          // objeto (el createLinearGradient no-op devuelve el proxy) y romperia
+          // cualquier String() del consumidor. Se anota null y listo.
+          rec.push({ op: k,
+                     stroke: typeof t.strokeStyle === 'string' ? t.strokeStyle : null,
+                     fill:   typeof t.fillStyle   === 'string' ? t.fillStyle   : null,
+                     lineWidth: t.lineWidth });
+          return ctxProxy;
+        };
+      }
       if (k in t) return t[k];
       // cualquier otro metodo de canvas es un no-op encadenable
       return () => ctxProxy;
@@ -37,8 +54,8 @@ function makeCtx(canvasEl){
   return ctxProxy;
 }
 
-function makeEl(tag){
-  const ctx = makeCtx(null);
+function makeEl(tag, rec){
+  const ctx = makeCtx(null, rec);
   const el = {
     tagName: String(tag || 'div').toUpperCase(),
     style: {}, dataset: {},
@@ -62,7 +79,8 @@ function makeEl(tag){
 /**
  * Construye el juego. Devuelve el hook con el estado y las funciones reales.
  */
-function buildGame(){
+function buildGame(opts){
+  const rec = (opts && opts.recordDraw) ? [] : null;
   const html = fs.readFileSync(HTML_PATH, 'utf8');
   const m = html.match(/<script>([\s\S]*?)<\/script>/);
   if (!m) throw new Error('no encontre el <script> en index.html');
@@ -77,13 +95,14 @@ function buildGame(){
   W, H, LX, LY, SELECTOR_Y, LEDGE_Y, FLOOR_Y, GRAV, V0, VEL,
   POWER_MIN, POWER_MAX, ELEMENT_INFO, ELKEYS, NIVELES,
   applyHit, addParticles, muzzlePos, vel, cooldownFor,
-  cargaMaxima, powerMult
+  cargaMaxima, powerMult,
+  arquetipoDe, arquetipoInfinito, enemigoNivel, enemigoInfinito, crearEnemigo
 };`;
   const close = src.lastIndexOf('})();');
   if (close < 0) throw new Error('no encontre el cierre del IIFE');
   src = src.slice(0, close) + hook + src.slice(close);
 
-  const canvasEl = makeEl('canvas');
+  const canvasEl = makeEl('canvas', rec);
   const els = {
     c: canvasEl,
     overlay: makeEl('div'),
@@ -127,6 +146,7 @@ function buildGame(){
   vm.createContext(sandbox);
   vm.runInContext(src, sandbox, { filename: 'index.html' });
   if (!sandbox.__G) throw new Error('el hook de exportacion no se inyecto');
+  if (rec) sandbox.__G.__drawLog = rec;   // log de lo realmente dibujado
   return sandbox.__G;
 }
 
