@@ -64,7 +64,14 @@ function makeEl(tag, rec){
     width: 360, height: 560,
     innerHTML: '', textContent: '', value: '',
     classList: { add(){}, remove(){}, toggle(){}, contains(){ return false } },
-    addEventListener(){}, removeEventListener(){}, dispatchEvent(){ return true },
+    // Los clics se registran y se pueden disparar a mano: asi un test de Node
+    // puede recorrer el flujo completo (victoria -> historia -> siguiente nivel)
+    // sin abrir un navegador. Sin esto, addEventListener era un no-op y ningun
+    // boton del overlay era accionable desde los tests.
+    addEventListener(t, fn){ this.__ls = this.__ls || {}; this.__ls[t] = fn; },
+    removeEventListener(t){ if(this.__ls) delete this.__ls[t]; },
+    dispatchEvent(){ return true },
+    click(){ const f = this.__ls && this.__ls.click; if(f) f({ target:this }); },
     appendChild(c){ return c }, removeChild(c){ return c }, remove(){},
     insertBefore(c){ return c },
     getBoundingClientRect(){ return { left:0, top:0, width:360, height:560, right:360, bottom:560 }; },
@@ -72,7 +79,7 @@ function makeEl(tag, rec){
     setAttribute(){}, removeAttribute(){}, getAttribute(){ return null },
     querySelector(){ return null }, querySelectorAll(){ return [] },
     scrollTop: 0, scrollHeight: 0, offsetWidth: 360, offsetHeight: 560,
-    focus(){}, blur(){}, click(){},
+    focus(){}, blur(){},
     setPointerCapture(){}, releasePointerCapture(){}, hasPointerCapture(){ return false }
   };
   return el;
@@ -98,7 +105,12 @@ function buildGame(opts){
   POWER_MIN, POWER_MAX, ELEMENT_INFO, ELKEYS, NIVELES,
   applyHit, addParticles, muzzlePos, vel, cooldownFor,
   cargaMaxima, powerMult,
-  arquetipoDe, arquetipoInfinito, enemigoNivel, enemigoInfinito, crearEnemigo
+    // El hook se inyecta DENTRO del IIFE, asi que solo ve lo que esta en su
+    // ambito. El stub de documento vive afuera: se le cuelga despues para que los
+    // tests puedan disparar clics sobre el overlay.
+    HISTORIA, mostrarHistoria, ganarNivel,
+    arquetipoDe, arquetipoInfinito, enemigoNivel, enemigoInfinito, crearEnemigo,
+    get overlayHTML(){ return overlayEl.innerHTML; }
 };`;
   const close = src.lastIndexOf('})();');
   if (close < 0) throw new Error('no encontre el cierre del IIFE');
@@ -149,6 +161,7 @@ function buildGame(opts){
   vm.runInContext(src, sandbox, { filename: 'index.html' });
   if (!sandbox.__G) throw new Error('el hook de exportacion no se inyecto');
   if (rec) sandbox.__G.__drawLog = rec;   // log de lo realmente dibujado
+  sandbox.__G.__doc = documentStub;       // para simular clics desde los tests
   return sandbox.__G;
 }
 
