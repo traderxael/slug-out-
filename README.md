@@ -2,6 +2,10 @@
 
 Juego de disparos parabólicos con babosas elementales. 8 elementos, 40 babosas coleccionables, 5 rarezas, cofres, habilidades definitivas, **potencia de tiro por arrastre** y enemigos que esquivan.
 
+> **¿Venís a seguir mejorando el juego?** → [**`ROADMAP.md`**](ROADMAP.md): el mapa
+> de `index.html` (dónde está cada cosa), cómo se trabaja con TDD, las recetas para
+> añadir niveles/arquetipos/habilidades y la lista de pendientes.
+
 ## 🎮 Cómo jugar
 
 Abrí `index.html` en tu navegador (doble click) o jugá online con GitHub Pages.
