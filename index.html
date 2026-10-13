@@ -101,7 +101,6 @@
   // veinte niveles te ensenan deja de servir, y hay que tirar y mirar.
   // El aire sigue siendo neutro en los dos sentidos — nunca hay un elemento
   // castigado de mas que los demas.
-  function anilloAlReves(L){ return !!(NIVELES[(L||1)-1] || {}).anilloInvertido; }
   function ventaja(elKey, enTipo, L){
     const gana = vence(elKey, enTipo);      // mi elemento vence al suyo
     const pierde = vence(enTipo, elKey);    // el suyo vence al mio
@@ -115,6 +114,208 @@
   function avisoAnillo(L){
     return anilloAlReves(L) ? '⟲ El anillo está al revés' : '';
   }
+
+  // ======== MODO INFINITO (issue #4: que sea un modo propio, no un extra) ========
+  // Lo que lo hace modo propio no es "mas niveles": es tener su propia lectura.
+  //   1. Los arquetipos se PRESENTAN de a uno y se avisan, como en la campana.
+  //   2. Tiene su mini historia, que da vueltas porque el modo no termina.
+  //   3. La dificultad crece en decisiones (rafaga, y el anillo que se invierte
+  //      por ciclos), no solo en un numero mas grande.
+  //   4. Cierra el lazo con las mejoras: gemas crecientes y un resumen final.
+
+  // --- 1. El anillo se invierte por ciclos ---
+  // En la campana lo dice el nivel. En infinito, del 25 en adelante, se invierte
+  // cada 8 olas: 25-32 al reves, 33-40 al derecho, 41-48 al reves... Es un ciclo
+  // que se puede aprender, no un castigo permanente ni un numero mas.
+  const CICLO_ANILLO_DESDE = 25, CICLO_ANILLO_LARGO = 8;
+  function anilloAlReves(L){
+    const nv = NIVELES[(L||1)-1];
+    if(nv) return !!nv.anilloInvertido;              // campana: lo dice el nivel
+    if(L >= CICLO_ANILLO_DESDE)
+      return Math.floor((L - CICLO_ANILLO_DESDE) / CICLO_ANILLO_LARGO) % 2 === 0;
+    return false;
+  }
+
+  // --- 2. Los arquetipos, presentados de a uno ---
+  // La campana los introduce por nivel. Aca por ola, y cada presentacion se
+  // avisa: un arquetipo nuevo sin aviso se descubre perdiendo tiros, y eso es
+  // justo lo que el juego no hace.
+  const PRESENTA = { 3:'escudado', 5:'frenetico', 7:'saltarin' };
+  const PRESENTA_TXT = {
+    escudado:   'NUEVO · el escudado: tiene escudo; mientras lo tenga solo le entra la mitad',
+    frenetico:  'NUEVO · el frenético: tira en ráfaga, no te quedes quieto en su andanada',
+    saltarin:   'NUEVO · el saltarín: salta tus tiros; tirale cuando cae'
+  };
+  function arquetipoInfinito(wave){
+    if(PRESENTA[wave]) return PRESENTA[wave];
+    if(wave >= 7){
+      if(wave % 5 === 0) return 'frenetico';
+      if(wave % 3 === 1) return 'saltarin';
+      if(wave % 3 === 2) return 'escudado';
+    }
+    return 'normal';
+  }
+  function avisoArquetipoInfinito(wave){
+    const a = PRESENTA[wave];
+    return a ? (PRESENTA_TXT[a] || '') : '';
+  }
+  // El banner de aviso del modo infinito. Uno a la vez, y con prioridad: si en
+  // la misma ola se presenta un arquetipo Y se invierte el anillo, gana el
+  // arquetipo (dos avisos juntos no se leen, se pierden los dos).
+  function avisoInfinito(wave){
+    const a = avisoArquetipoInfinito(wave);
+    if(a) return a;
+    // Se avisa al ENTRAR en un ciclo invertido, no en cada ola del ciclo.
+    if(anilloAlReves(wave) && !anilloAlReves(wave-1))
+      return '⟲ EL ANILLO ESTÁ AL REVÉS · lo que vencía pierde, lo que perdía vence';
+    return '';
+  }
+  // El enemigo de la ola. A diferencia de la campana, la rafaga CRECE (un bicho
+  // mas gordo no es mas dificil, es mas largo) y todos los topes son honestos:
+  // sin pausa entre andanadas no hay nada que leer.
+  function enemigoInfinito(wave){
+    const boss = wave%5===0;
+    return crearEnemigo({
+      hp: Math.round((60+wave*18)*(boss?1.4:1)), boss:boss,
+      vx: Math.min(0.14, (40+wave*3)/1000), pool:ELKEYS,
+      atkInterval: Math.max(1100, 3400-wave*80), atkDamage: 6+wave*1.3,
+      rafaga: Math.min(4, 1 + Math.floor(wave/10)),
+      evasion: Math.min(0.5, wave*0.025),
+      arquetipo: arquetipoInfinito(wave)
+    });
+  }
+
+  // --- 3. La historia propia del infinito ---
+  // Ocho fragmentos. Cada uno se lee durante 7 olas y despues entra el
+  // siguiente; al terminar los ocho VUELVE a empezar, porque el modo no
+  // termina. La lista de olas se calcula de la formula, asi que no puede
+  // quedarse desfasada de cuando se muestran.
+  const HISTORIA_INF = [
+    { titulo:'La cueva no se acaba', texto:'Bajaste hasta el manantial y el manantial tenía fondo. Ocho elementos, ocho nombres, ocho puertas: y ninguna cerrada del todo. La que selló el rey se abre desde el otro lado.' },
+    { titulo:'Lo que vuelve',          texto:'Las babosas de la primera camada aparecen otra vez, en el mismo orden. No es que el tiempo repita: es que la cueva no aprende, y vos sí.' },
+    { titulo:'El escudo y su coste',   texto:'El escudado no es más fuerte: es más paciente. Mientras lo tenga, tus tiros hacen la mitad. El que espera a que baje el escudo gana la misma pelea con menos vida.' },
+    { titulo:'El anillo, de nuevo',    texto:'Llega la ola veinticinco y el anillo se da vuelta otra vez. Veinte niveles te enseñaron qué vence a qué; acá eso vuelve a no servir, y hay que tirar y mirar.' },
+    { titulo:'Vueltas',                texto:'El anillo se invierte cada ocho olas, derecho e invertido, derecho e invertido. Después de un par de ciclos lo lees sin pensarlo, y eso es todo el juego.' },
+    { titulo:'Lo que juntaste',        texto:'Las gemas no se van cuando caés. Se quedan en el arma, en las babosas, en el escudo. Cada vuelta a la cueva la hacés con lo que trajiste de la anterior.' },
+    { titulo:'El que no tiene nombre', texto:'Entre los ocho elementos sigue habiendo un hueco sin color. No lo llena nadie, y la cueva no parece echarlo de menos.' },
+    { titulo:'Sin fondo',              texto:'No hay un nivel que cierre. Hay la ola que sigue, y la de después. El manantial no era el final de la cueva: era el principio de la parte que no tiene mapa.' }
+  ];
+  const HIST_INF_PRIMERA = 3, HIST_INF_DUR = 7;
+  const OLAS_HISTORIA = HISTORIA_INF.map((f, i) => HIST_INF_PRIMERA + i*HIST_INF_DUR);
+  // El fragmento que le toca a una ola. Da vueltas: pasado el ultimo vuelve el
+  // primero, asi la historia nunca se "acaba" y deja al modo sin nada que leer.
+  function fragmentoInfinito(ola){
+    const n = HISTORIA_INF.length;
+    const i = Math.floor((ola - HIST_INF_PRIMERA) / HIST_INF_DUR);
+    return i < 0 ? null : HISTORIA_INF[i % n];
+  }
+  function esOlaHistoria(ola){
+    return ola >= HIST_INF_PRIMERA && ((ola - HIST_INF_PRIMERA) % HIST_INF_DUR) === 0;
+  }
+  // Para el overlay: el fragmento con su ola y su color, igual que la campana.
+  function historiaInfinito(ola){
+    const f = fragmentoInfinito(ola);
+    return f ? { titulo:f.titulo, texto:f.texto, ola:ola, col:'#ff9ad5' } : null;
+  }
+  // Cuantos fragmentos ya se vivieron. Como en la campana: si llegaste a la ola,
+  // ya lo viste — no hace falta guardar nada aparte.
+  function histInfVistas(){
+    let n = 0;
+    for(let i=0;i<OLAS_HISTORIA.length;i++) if(save.mejorOla >= OLAS_HISTORIA[i]) n++;
+    return n;
+  }
+  // El overlay del fragmento. Misma forma que la campana (se lee, se puede
+  // saltar) porque es el mismo gesto: el modo cambia, la lectura no.
+  function mostrarHistoriaInfinito(ola, continuar){
+    const h = historiaInfinito(ola);
+    if(!h || typeof continuar !== 'function'){ if(continuar) continuar(); return; }
+    showOverlay(
+        '<div class="hist">'
+      +   '<div class="histTag" style="color:'+h.col+'">Ola '+ola+' · modo infinito</div>'
+      +   '<div class="histLinea" style="background:'+h.col+'"></div>'
+      +   '<h2 class="histTit" style="color:'+h.col+'">'+h.titulo+'</h2>'
+      +   '<p class="histP">'+h.texto+'</p>'
+      +   '<div class="fila" style="margin-top:8px">'
+      +     '<button class="btn btnAlt btnS" id="btnSaltarHistInf">Saltar</button>'
+      +     '<button class="btn" id="btnSeguirHistInf">Continuar</button>'
+      +   '</div>'
+      + '</div>');
+    bind('btnSaltarHistInf', ()=>{ hideOverlay(); continuar(); });
+    bind('btnSeguirHistInf',  ()=>{ hideOverlay(); continuar(); });
+  }
+  // Volver a leer los fragmentos del infinito, en orden. Se ve lo ya VIVIDO
+  // (si llegaste a la ola, ya lo viste) y lo demas queda tapado con ???, igual
+  // que la ruta de la campana: se ve lo que falta sin adelantar nada.
+  function renderHistoriaInfinito(){
+    detenerJuego();
+    let items = '', vistas = 0;
+    OLAS_HISTORIA.forEach((ola, i)=>{
+      const f = HISTORIA_INF[i % HISTORIA_INF.length];
+      const vivo = save.mejorOla >= ola;
+      if(vivo) vistas++;
+      items +=
+        '<div class="hist'+(vivo?' histVivo':'')+'" id="histinf_'+i+'" '
+      +   'style="border:1px solid var(--line);border-radius:8px;padding:8px 10px;'
+      +   'margin:5px 0;cursor:'+(vivo?'pointer':'default')+';opacity:'+(vivo?1:0.45)+';">'
+      +   '<div style="font-size:10px;color:#ff9ad5;letter-spacing:1px;">OLA '+ola+'</div>'
+      +   '<div style="font-size:13px;color:'+(vivo?'#e8f4ff':'#5b666c')+';">'
+      +     (vivo ? f.titulo : '???')+'</div>'
+      + '</div>';
+    });
+    showOverlay(
+        '<h2>La cueva sin fondo</h2>'
+      + '<p style="color:#6ad4ff;font-size:12px;">Los fragmentos del modo infinito · '
+      + vistas+' de '+OLAS_HISTORIA.length+' vividos · dan vueltas, como el modo</p>'
+      + '<div style="max-height:330px;overflow-y:auto;text-align:left;max-width:330px;">'
+      +   items
+      + '</div>'
+      + '<button class="btn btnAlt" id="btnVolver">Volver</button>');
+    OLAS_HISTORIA.forEach((ola, i)=>{
+      if(save.mejorOla >= ola) bind('histinf_'+i, ()=>mostrarHistoriaInfinito(ola, renderHistoriaInfinito));
+    });
+    bind('btnVolver', renderMenu);
+  }
+  // --- 4. El lazo con las mejoras ---
+  // Las gemas por ola crecen: farmear hondo rinde mas, y eso es lo que alimenta
+  // las mejoras. Sin crecimiento el infinito no serviria para nada.
+  function gemasPorOla(ola){
+    return 6 + Math.floor(ola*1.5) + (ola%5===0 ? 15 : 0);
+  }
+  // Cuanto falta para la mejora mas barata que se puede comprar ahora. Con esto
+  // el final de una partida no es "perdiste en la ola X": es cuanto le falta a
+  // lo que ya venis juntando.
+  function siguienteMejora(m){
+    m = m || save.mejoras;
+    const opciones = [
+      { clave:'arma',      nombre:'el arma',   nivel:m.arma },
+      { clave:'escudo',    nombre:'el escudo', nivel:m.escudo },
+      { clave:'rapidfire', nombre:'el fuego rápido', nivel:m.rapidfire }
+    ];
+    Object.keys(m.babosas || {}).forEach(el=>{
+      if(m.babosas[el] > 0) opciones.push({ clave:'babosa:'+el, nombre:'la babosa de '+ELEMENT_INFO[el].nombre.toLowerCase(), nivel:m.babosas[el] });
+    });
+    let mejor = null;
+    opciones.forEach(o=>{
+      if(o.nivel >= MEJORA_MAX) return;
+      const c = costoMejora(o.clave, o.nivel);
+      if(!mejor || c < mejor.costo) mejor = { costo:c, nombre:o.nombre, nivel:o.nivel };
+    });
+    return mejor;
+  }
+  function resumenMejoras(m){
+    m = m || save.mejoras;
+    const partes = [];
+    if(m.arma > 0) partes.push('arma +'+Math.round((armaDano(m.arma)-1)*100)+'% de daño');
+    if(m.escudo > 0) partes.push('escudo '+(escudoDur(m.escudo)/1000).toFixed(1)+'s ×'+usosEscudo(m.escudo));
+    if(m.rapidfire > 0) partes.push('fuego rápido ×'+(2));
+    const bab = Object.keys(m.babosas || {}).filter(e=>m.babosas[e] > 0);
+    if(bab.length) partes.push(bab.length+' babosa'+(bab.length>1?'s':'')+' mejorada'+(bab.length>1?'s':''));
+    const sig = siguienteMejora(m);
+    const txt = partes.length ? partes.join(' · ') : 'todavía sin mejoras';
+    return txt + (sig ? ' · falta '+sig.costo+' 💎 para subir '+sig.nombre
+                      : ' · todo al máximo');
+  }
+
   // ======== MEJORAS (se compran con gemas) ========
   // Dos pistas permanentes (arma y babosas) y dos habilidades que se USAN en
   // combate (escudo y fuego rapido). Todo tiene tope: una mejora que no tiene
@@ -432,6 +633,8 @@
     {id:'dano_10000',       nombre:'Diez mil de daño',  desc:'Hacé 10000 de daño total',      gemas:100, check:s=>s.stats.danoTotal>=10000},
     {id:'ola_10',           nombre:'Ola 10',            desc:'Llegá a la ola 10 en infinito', gemas:40,  check:s=>s.mejorOla>=10},
     {id:'ola_25',           nombre:'Ola 25',            desc:'Llegá a la ola 25 en infinito', gemas:100, check:s=>s.mejorOla>=25},
+    {id:'ola_40',           nombre:'Ola 40',            desc:'Llegá a la ola 40 en infinito', gemas:180, check:s=>s.mejorOla>=40},
+    {id:'ola_60',           nombre:'Ola 60',            desc:'Llegá a la ola 60 en infinito', gemas:300, check:s=>s.mejorOla>=60},
     {id:'nivel_5',          nombre:'Nivel 5',           desc:'Llegá al nivel 5',              gemas:30,  check:s=>s.nivel>=5},
     // El id se MANTIENE a proposito: cambiar el id haria perder el logro a los
     // que ya lo ganaron. Lo que cambia es el nombre, porque con 20 niveles el 12
@@ -944,23 +1147,9 @@
       arquetipo: arquetipoDe(L, idx, boss)
     });
   }
-  // Mismo criterio en modo infinito: aparecen por oleada, de a uno.
-  function arquetipoInfinito(wave){
-    if(wave%5===0) return 'frenetico';
-    if(wave>=10 && wave%3===1) return 'saltarin';
-    if(wave>=6  && wave%3===2) return 'escudado';
-    return 'normal';
-  }
-  function enemigoInfinito(wave){
-    const boss = wave%5===0;
-    return crearEnemigo({
-      hp: Math.round((60+wave*18)*(boss?1.4:1)), boss:boss,
-      vx: Math.min(0.14, (40+wave*3)/1000), pool:ELKEYS,
-      atkInterval: Math.max(1600, 3400-wave*80), atkDamage: 6+wave*1.3, rafaga:1,
-      evasion: Math.min(0.4, wave*0.025),
-      arquetipo: arquetipoInfinito(wave)
-    });
-  }
+  // El enemigo del modo infinito (arquetipoInfinito y enemigoInfinito) vive
+  // arriba, con el resto del modo: la presentacion de arquetipos, los ciclos
+  // del anillo y la historia propia.
   function nuevoEstado(modo, L){
     const equipo = equipoActual();
     const rar = {};
@@ -1377,6 +1566,21 @@
       state.wave++;
       state.player.hp = Math.min(state.player.maxHp, state.player.hp+(jefe?25:10));
       state.enemy = enemigoInfinito(state.wave);
+      // El infinito tiene su propia mini historia: entra cada 7 olas y da
+      // vueltas. Se muestra al AVANZAR (igual que la campana), se puede saltar,
+      // y es el puente entre olas — no un texto que aparece y tapa el combate.
+      if(esOlaHistoria(state.wave)){
+        running = false;
+        mostrarHistoriaInfinito(state.wave, ()=>{ running = true; });
+      }
+      // La presentacion de un arquetipo, o el anillo que se invierte al entrar
+      // en un ciclo nuevo, se avisa con el mismo banner: se lee antes de tirar,
+      // no se descubre perdiendo tiros.
+      const avisoA = avisoInfinito(state.wave);
+      if(avisoA){
+        state.avisoHasta = (typeof performance!=='undefined' ? performance.now() : 0) + 2600;
+        state.avisoTexto = avisoA;
+      }
     }
     state.ultiCharge = Math.min(state.ultiMax, state.ultiCharge+15);
   }
@@ -2218,21 +2422,29 @@
       ctx.fillStyle = UI.dim; ctx.font = '10px sans-serif';
       const hud = state.modo==='nivel' ? 'Nivel '+state.nivel+' · '+Math.min(state.idx+1,state.n)+'/'+state.n : 'Ola '+state.wave;
       ctx.fillText(hud+' · '+state.score+' pts', W/2, 20);
-      // El aviso del anillo al reves: banner los primeros segundos y marca fija
-      // en el HUD durante todo el nivel. Antes de tirar hay que saberlo.
-      if(state.avisoHasta){
+      // El aviso: banner los primeros segundos y marca fija en el HUD. Antes de
+      // tirar hay que saberlo — vale para el anillo al reves y para la
+      // presentacion de un arquetipo nuevo.
+      if(state.avisoHasta || anilloAlReves(state.modo==='infinito' ? state.wave : state.nivel)){
         const ahora = (typeof performance!=='undefined') ? performance.now() : 0;
-        if(ahora < state.avisoHasta){
+        const txt = state.avisoTexto
+                 || (anilloAlReves(state.modo==='infinito' ? state.wave : state.nivel)
+                     ? '⟲ EL ANILLO ESTÁ AL REVÉS' : '');
+        if(txt && ahora < state.avisoHasta){
           const a = Math.min(1, (state.avisoHasta-ahora)/900);
           ctx.globalAlpha = a;
           ctx.fillStyle = '#ff9ad5'; ctx.font = '600 13px sans-serif';
-          ctx.fillText('⟲ EL ANILLO ESTÁ AL REVÉS', W/2, 150);
+          ctx.fillText(txt.length > 34 ? txt.slice(0, 33)+'…' : txt, W/2, 150);
           ctx.fillStyle = UI.dim; ctx.font = '9px sans-serif';
-          ctx.fillText('lo que vencía pierde · lo que perdía vence', W/2, 166);
+          ctx.fillText('se lee, no se descubre perdiendo tiros', W/2, 166);
           ctx.globalAlpha = 1;
         }
-        ctx.fillStyle = '#ff9ad5'; ctx.font = '9px sans-serif';
-        ctx.fillText('⟲ anillo al revés', W/2, 46);
+        // La marca fija del anillo: mientras el anillo este al reves, seguir
+        // mirando el HUD alcanza para acordarse.
+        if(anilloAlReves(state.modo==='infinito' ? state.wave : state.nivel)){
+          ctx.fillStyle = '#ff9ad5'; ctx.font = '9px sans-serif';
+          ctx.fillText('⟲ anillo al revés', W/2, 46);
+        }
       }
       // Las habilidades compradas: cuantos usos quedan, y si alguna está
       // prendida con cuanto tiempo. Se lee de un vistazo sin abrir nada.
@@ -2417,8 +2629,12 @@
     kbdPower = 1; kbdAimAngle = -Math.PI/2; kbdAimUsado = false;
     for(const k in keys) keys[k] = false;
     // El anillo al reves se anuncia al entrar, y el aviso queda en el HUD todo
-    // el nivel: se lee, no se descubre perdiendo tiros.
-    state.avisoHasta = anilloAlReves(L) ? (typeof performance!=='undefined' ? performance.now() : 0) + 2600 : 0;
+    // el nivel: se lee, no se descubre perdiendo tiros. En infinito el aviso
+    // sale de la ola (presentacion de arquetipo o ciclo invertido).
+    const nivelAviso = (modo==='infinito') ? 1 : L;
+    const avisoTxt = (modo==='infinito') ? avisoInfinito(1) : avisoAnillo(L);
+    state.avisoHasta = avisoTxt ? (typeof performance!=='undefined' ? performance.now() : 0) + 2600 : 0;
+    state.avisoTexto = avisoTxt || '';
     animId = requestAnimationFrame(loop);
   }
   function salir(){ if(state && state.modo==='nivel') renderNiveles(); else renderMenu(); }
@@ -2503,7 +2719,9 @@
     if(isRecord) save.mejorOla = state.wave;
     if(isScoreRecord) save.mejorPuntaje = state.score;
     const cofresGanados = Math.floor(superadas/5);
-    const gemas = superadas*2 + Math.floor(state.maxCombo*2);
+    // Las gemas crecen con la ola: farmear hondo rinde mas, y eso es lo que
+    // alimenta las mejoras. Sin crecimiento el infinito no serviria para nada.
+    const gemas = gemasPorOla(state.wave) + Math.floor(state.maxCombo*2);
     save.cofres.madera += cofresGanados;
     save.gemas += gemas;
     save.stats.partidas++;
@@ -2518,6 +2736,10 @@
         +'<p>Llegaste a la ola '+wave+' con '+score+' puntos.<br>Combo máximo: '+mc+'</p>'
         +(isRecord?'<p style="color:#6ad4ff;">Nuevo récord de ola</p>':(isScoreRecord?'<p style="color:#6ad4ff;">Nuevo récord de puntos</p>':''))
         +'<p style="font-size:11px;">Mejor: ola '+save.mejorOla+' · '+save.mejorPuntaje+' pts</p>'
+        // El lazo con las mejoras: no alcanza con decir donde caiste, hay que
+        // decir en que se convirtio lo que juntaste y cuanto falta para la
+        // siguiente. Si no, el infinito no lleva a ningun lado.
+        +'<p style="font-size:11px;color:#ffd479;">🔧 '+resumenMejoras()+'</p>'
         +((cofresGanados||gemas)?'<p style="color:#6ad4ff;">+'+gemas+' gemas'+(cofresGanados?' · +'+cofresGanados+' cofre(s) de madera':'')+(extra?' · '+extra+' cofre(s) en combate':'')+'</p>':'')
         +'<button class="btn" id="btnRetry">Jugar de nuevo</button>'
         +'<button class="btn btnAlt" id="btnMenu">Menú</button>'
@@ -2573,14 +2795,17 @@
       +'<button class="btn btnAlt" id="btnColeccion">Colección '+totalBabosas()+'/40</button>'
       +'<button class="btn btnAlt" id="btnDesafios">Desafíos diarios</button>'
       +'<button class="btn btnAlt" id="btnLogros">Logros '+logrosCount+'/'+LOGROS.length+'</button>'
+      +'<button class="btn btnAlt" id="btnHistoriaInf">🌀 La cueva sin fondo</button>'
       +'<button class="btn btnAlt" id="btnAyuda">Cómo jugar</button>'
       +'<p style="font-size:11px;color:#8a8a99;">PC: flechas + espacio · P pausa · M sonido'+(save.mute?' · 🔇 silencio':'')+'</p>'
       +'<p style="font-size:12px;color:#6ad4ff;">Gemas: '+save.gemas+' · Récord infinito: ola '+save.mejorOla+' · '+save.mejorPuntaje+' pts</p>'
+      +'<p style="font-size:11px;color:#ff9ad5;">La cueva sin fondo: '+histInfVistas()+' de '+OLAS_HISTORIA.length+' fragmentos vividos</p>'
     );
     bind('btnNiveles', renderNiveles);
     bind('btnEquipo', renderEquipo);
     bind('btnMejoras', renderMejoras);
     bind('btnHistoria', renderHistoria);
+    bind('btnHistoriaInf', renderHistoriaInfinito);
     bind('btnInfinito', ()=>iniciar('infinito'));
     bind('btnCofres', renderCofres);
     bind('btnColeccion', renderColeccion);
@@ -2863,6 +3088,7 @@
       +'<p style="text-align:left;font-size:12px;color:#b9a6e8;"><b>📖 La historia de la campana</b><br>Tras cada combate ganado, un pedazo de historia cuenta qué pasa en la cueva y por qué la estás recorriendo. El arco se lee con los elementos: el fuego que seca, el hielo que conserva, la sombra que drena. Son <b>28 fragmentos</b>: los 12 primeros son el viaje hasta la verdad, del 13 al 20 las consecuencias de haber abierto la cueva, y del 21 al 28 el descenso hasta la fuente — donde se descubre que el anillo nunca fue una ley. Si no te interesa, <b>Saltar</b> y listo. Cuando quieras, en el menú está <b>Ruta de la cueva</b> para volver a leerlos en orden.</p>'
       +'<p style="text-align:left;font-size:12px;color:#8fd68a;"><b>🐌 Tu equipo de combate</b><br>Tenés una mochila con babosas, pero al combate entran <b>solo 3</b>. En el menú, <b>Equipo</b> abre el selector: tocá una babosa de la mochila para meterla, y tocá una del equipo para sacarla. Las marcadas llevan el borde de su color. Cuando el equipo está lleno las demás se apagan: hay que sacar una antes de meter otra. El equipo queda guardado, así que elegís una vez y peleás siempre con esas 3. En combate cambiás entre ellas con el selector de abajo o las teclas <b>1, 2 y 3</b>.</p>'
       +'<p style="text-align:left;font-size:12px;color:#7fd4ff;"><b>🔧 Mejoras</b><br>Las gemas no solo abren cofres: en el menú, <b>Mejoras</b> las convierte en progreso permanente. Cuatro cosas, todas con tope de 5:<br>· <b>🔫 El arma</b>: +6% de daño y −4% de recarga por nivel, en todos los combates.<br>· <b>🐌 Cada babosa</b>: +8% de daño al tirar con ella. Solo podés mejorar las que tengas.<br>· <b>🛡️ Escudo</b> (tecla E): frena todo el daño mientras esté puesto. Cada golpe que frena lo gasta un poco, así que usarlo justo en la andanada rinde más que dejarlo prendido de entrada.<br>· <b>⚡ Fuego rápido</b> (tecla F): la recarga cae a la mitad. Tirás al doble de velocidad, pero cada tiro sale menos cargado.</p>'
+      +'<p style="text-align:left;font-size:12px;color:#ff9ad5;"><b>🌀 Modo infinito</b><br>La cueva no termina. Aguanta todas las olas que puedas y las gemas se te acumulan para las mejoras.<br>· Los arquetipos se <b>presentan de a uno</b> y se avisan en un banner: nunca te los tirás sin saber qué son.<br>· Cada 7 olas entra un fragmento de <b>La cueva sin fondo</b>, que se puede saltar y da vueltas: son 8, y cuando se acaban vuelve el primero.<br>· <b>Del 25 en adelante el anillo se invierte cada 8 olas</b> (25-32 al revés, 33-40 al derecho, 41-48 al revés…). Se avisa al entrar en cada ciclo y queda marcado en el HUD.<br>· Las gemas por ola crecen: farmear hondo rinde más. Al caer, el resumen te dice cuánto te dio cada mejora y cuánto falta para la siguiente.</p>'
       +'<p style="text-align:left;font-size:12px;color:#6ad4ff;"><b>Teclado (PC)</b><br>← → apuntar · ↑ ↓ potencia · Espacio disparar · 1-3 elemento · U ULTI · <b>E escudo</b> · <b>F fuego rápido</b> · P pausa · M sonido · R reiniciar</p>'
       +'<p style="text-align:left;font-size:11px;">'+ventajas+'</p>'
       +'<p style="text-align:left;font-size:11px;">'+habil+'</p>'

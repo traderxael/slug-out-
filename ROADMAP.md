@@ -42,7 +42,7 @@ test de Node puede recorrer `victoria → historia → siguiente nivel` completo
 
 ---
 
-## Mapa de `index.html` (~2800 líneas)
+## Mapa de `index.html` (~2960 líneas)
 
 ### Datos y constantes
 | Línea | Qué |
@@ -111,6 +111,23 @@ timers `escudoLeft` / `rapidLeft` bajan en `update`; `cooldownFor` multiplica po
 `armaDano()` y por `babosaDano(elKey)`. Teclas `E` y `F`, HUD 🛡️/⚡ con usos y
 segundos restantes. `save.mejoras` sobrevive el guardado; `normalizeSave` lo sanea
 al tope y los saves viejos arrancan en 0.
+
+### Modo infinito (la cueva sin fondo)
+`anilloAlReves(L)` — en la campana lo dice el nivel; en infinito, del 25 en
+adelante, se invierte por ciclos de 8 (`CICLO_ANILLO_DESDE=25`,
+`CICLO_ANILLO_LARGO=8`). `PRESENTA` / `PRESENTA_TXT` (ola 3 escudado, 5
+frenético, 7 saltarín) y `avisoArquetipoInfinito(wave)` · `avisoInfinito(wave)`
+— **un** banner con prioridad: presentación de arquetipo > ciclo invertido. Se
+avisa al entrar en el ciclo, no en cada ola. `arquetipoInfinito(wave)` (después
+de la 7 mezcla por módulos) · `enemigoInfinito(wave)` (ráfaga `min(4,
+1+⌊wave/10⌋)`, piso de intervalo 1100ms). `HISTORIA_INF` (8 fragmentos) ·
+`OLAS_HISTORIA` derivado de `HIST_INF_PRIMERA=3` / `HIST_INF_DUR=7` ·
+`fragmentoInfinito(ola)` **da vueltas** (`i % 8`) · `esOlaHistoria(ola)` ·
+`mostrarHistoriaInfinito` / `renderHistoriaInfinito` (menú: "La cueva sin fondo")
+· `histInfVistas()` (deriva de `save.mejorOla`, no guarda nada aparte) ·
+`gemasPorOla(ola)` (`6+⌊ola×1.5⌋`, +15 en jefes) · `siguienteMejora(m)` y
+`resumenMejoras(m)` para el cierre del lazo con las mejoras. La historia entra en
+`siguienteEnemigo()` al **avanzar** y se puede saltar; logros `ola_40` y `ola_60`.
 
 ---
 
@@ -203,8 +220,11 @@ exactamente los 3 nombres elegidos). Ambos se escribieron antes que el código.
   de las dos, para enseñar de a una.
 - **Un epílogo tras el nivel 12.** El arco cierra con "La verdad", pero el juego
   sigue. Un último fragmento que diga qué pasó después daría cierre real.
-- **El modo infinito tiene menos pulido que la campana.** No tiene historia ni
-  progresión de arquetipos tan clara; se siente como un extra.
+- ~~**El modo infinito tiene menos pulido que la campana.**~~ ✅ HECHO — ahora es
+  un modo propio: arquetipos presentados de a uno con aviso, 8 fragmentos de
+  historia que dan vueltas, el anillo invertido por ciclos del 25 en adelante, y
+  el lazo con las mejoras (gemas crecientes + resumen final). Ver
+  `test-infinito.cjs` (46 checks) y `test-infinito-browser.py`.
 
 ---
 
