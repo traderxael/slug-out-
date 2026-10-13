@@ -11,7 +11,7 @@ from playwright.async_api import async_playwright
 URL  = "file:///C:/Users/USUARIO/slug-out-/index.html"
 EDGE = r"C:\Program Files (x86)\Microsoft\Edge\Application\msedge.exe"
 SAVE = "lanzador_cavernas_2_save_v1"
-TOTAL = 20
+TOTAL = 28
 
 fallos = []
 def check(nombre, ok, detalle=""):
@@ -44,7 +44,7 @@ async def main():
         await p.click("#btnHistoria"); await p.wait_for_timeout(500)
         txt = await ov()
         check("el boton abre la ruta de la cueva", "ruta de la cueva" in txt.lower(), txt[:50].replace(chr(10)," "))
-        check("el contador dice 5 de 20 vividos", "5 de 20" in txt, txt[:70].replace(chr(10)," "))
+        check("el contador dice 5 de 28 vividos", f"5 de {TOTAL}" in txt, txt[:70].replace(chr(10)," "))
 
         # Los 5 vividos muestran su titulo; los 15 tapados muestran ???.
         titulos = await p.evaluate("""() => {
@@ -57,15 +57,15 @@ async def main():
           });
           return out;
         }""")
-        check("la ruta lista los 20 fragmentos", titulos["total"] == TOTAL, f"hay {titulos['total']}")
-        check("5 estan vividos y 15 tapados",
-              len(titulos["vistos"]) == 5 and titulos["tapados"] == 15,
+        check(f"la ruta lista los {TOTAL} fragmentos", titulos["total"] == TOTAL, f"hay {titulos['total']}")
+        check("5 estan vividos y el resto tapado",
+              len(titulos["vistos"]) == 5 and titulos["tapados"] == TOTAL - 5,
               f"vistos={len(titulos['vistos'])}, tapados={titulos['tapados']}")
 
         # Los tapados estan visualmente apagados (opacidad), no son un hueco.
         opacos = await p.evaluate("""() => Array.from(document.querySelectorAll('[data-hist]'))
               .filter(n => n.getAttribute('style').includes('opacity')).length""")
-        check("lo no jugado se ve apagado, no como hueco", opacos == 15, f"apagados={opacos}")
+        check("lo no jugado se ve apagado, no como hueco", opacos == TOTAL - 5, f"apagados={opacos}")
 
         log("=== B. tocar un fragmento lo vuelve a mostrar ===")
         await p.click('[data-hist="3"]'); await p.wait_for_timeout(500)
@@ -88,7 +88,7 @@ async def main():
         await p.click("#btnVolver"); await p.wait_for_timeout(400)
         await p.click("#btnNiveles"); await p.wait_for_timeout(500)
         lvs = await p.evaluate("() => document.querySelectorAll('.lv').length")
-        check("hay 20 niveles en el selector", lvs == TOTAL, f"hay {lvs}")
+        check(f"hay {TOTAL} niveles en el selector", lvs == TOTAL, f"hay {lvs}")
         desbloq = await p.evaluate("""() => Array.from(document.querySelectorAll('.lv'))
               .filter(n => !n.disabled).length""")
         check("y estan desbloqueados hasta el 6 (donde llego el save)",

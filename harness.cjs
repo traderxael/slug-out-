@@ -113,6 +113,7 @@ function buildGame(opts){
     equipoActual, baseSave, normalizeSave, mejorRareza, renderMenu,
     toggleEquipo, renderEquipo, EQUIPO_MAX,
     statsNivel, LOGROS, COFRES,
+    vence, ventaja, renderNiveles, avisoAnillo,
     renderHistoria, histVistas,
     get overlayHTML(){ return overlayEl.innerHTML; }
 };`;

@@ -204,9 +204,31 @@ se lee con el mismo lenguaje que el combate.
 
 ### 📖 Volver a leer la ruta
 
-En el menú, **Ruta de la cueva** lista los 20 fragmentos en orden. Se ven solo los
+En el menú, **Ruta de la cueva** lista los 28 fragmentos en orden. Se ven solo los
 ya vividos (un nivel ganado = su fragmento ya visto), y tocar uno lo relee. Lo no
 jugado aparece tapado con `???`, para que se vea lo que falta sin adelantar nada.
+
+### ⟲ Más abajo: el anillo al revés (21 al 28)
+
+El 20 era dejar la cueva abierta y bajar. El tercer acto es el descenso hasta la
+fuente, y el hallazgo: **el anillo de elementos nunca fue una ley** — era una
+costumbre de la cueva, y abajo nadie la tiene.
+
+| Nivel | Fragmento |
+|---|---|
+| 21 · La garganta | **La garganta** — angosta y pulida, como si algo la hubiera usado mucho |
+| 22 · Lo que suena | **Lo que suena** — no es agua: es lo que el agua era antes de secarse |
+| 24 · El que selló primero | **El que selló primero** — el rey no fue el primero, y su costumbre quedó |
+| 27 · El elemento sin nombre | **El elemento sin nombre** — entre los ocho hay un hueco sin color |
+| 28 · El manantial | **El manantial** — "no hay ocho. Hay uno" |
+
+**Del 25 al 28 el anillo está al revés**: lo que vencía **pierde**, y lo que
+perdía **vence**. No es más difícil — es que veinte niveles de instinto dejan de
+servir y hay que tirar, mirar qué pasa, y volver a tirar.
+
+No se adivina: el selector lo marca en la tarjeta, explica la regla arriba, y al
+entrar al combate sale un **banner** que después queda como marca fija en el HUD
+durante todo el nivel.
 
 ## ⚔️ Elementos
 
@@ -223,7 +245,7 @@ jugado aparece tapado con `???`, para que se vea lo que falta sin adelantar nada
 
 ## 🏆 Sistemas
 
-- **20 niveles** con Guardianes jefes
+- **28 niveles** con Guardianes jefes
 - **Modo infinito** con dificultad progresiva
 - **Equipo de combate de 3 babosas**: juntás una mochila de hasta 8 elementos, pero
   al combate entran **solo las 3 que elijas**. En el menú, **Equipo** abre el
@@ -232,8 +254,8 @@ jugado aparece tapado con `???`, para que se vea lo que falta sin adelantar nada
   apagan (hay que sacar una antes de meter otra). La elección queda guardada, así
   que armás el equipo una vez y peleás siempre con esas 3.
 - **5 cofres**: madera, hierro, dorado, cristal y mítico
-- **26 logros** desbloqueables (incluye *Francotirador* por críticos, *A toda carga*
-  por disparos a carga máxima y *¡Completaste la cueva!* por llegar al 20)
+- **27 logros** desbloqueables (incluye *Francotirador* por críticos, *A toda carga*
+  por disparos a carga máxima y *¡Llegaste al manantial!* por llegar al 28)
 - **3 desafíos diarios** con recompensa en gemas
 - **Racha diaria** de días consecutivos jugando
 - **Pausa** con reanudar / reiniciar / silenciar, y pausa automática al cambiar de pestaña
@@ -319,7 +341,7 @@ node test-equipo.cjs
 #     para leer los nombres que pinta el selector de abajo)
 "C:/Users/USUARIO/AppData/Local/Programs/Python/Python312/python.exe" test-equipo-browser.py
 
-# 29. La campana de 20 niveles y su ruta de historia: un fragmento por nivel,
+# 29. La campana de 28 niveles y su ruta de historia: un fragmento por nivel,
 #     el arco que cierra en el ultimo, el balance sano hasta el 20, y el logro
 #     del final apuntando al nivel correcto
 node test-niveles.cjs
@@ -327,6 +349,15 @@ node test-niveles.cjs
 # 30. End-to-end en Edge real: abrir la ruta, ver solo lo ya vivido, releer un
 #     fragmento tocandolo, y el selector de niveles llegando a 20
 "C:/Users/USUARIO/AppData/Local/Programs/Python/Python312/python.exe" test-ruta-browser.py
+
+# 31. El anillo al reves del tercer acto: que ventaja() invierta de verdad el
+#     multiplicador, que el aire nunca quede castigado, y que la inversion no
+#     toque los niveles 1-20
+node test-niveles.cjs
+
+# 32. End-to-end en Edge real: el banner del anillo al reves pintado en el canvas,
+#     la marca del HUD, y el selector avisando en los niveles 25 al 28
+"C:/Users/USUARIO/AppData/Local/Programs/Python/Python312/python.exe" test-anillo-browser.py
 ```
 
 La suite 16 no cuenta píxeles: usa el modo de grabación del harness
@@ -335,7 +366,7 @@ La suite 16 no cuenta píxeles: usa el modo de grabación del harness
 porque el escudo cian `(127,212,255)` y el proyectil de hielo `#6fd6e6` son casi el mismo
 tono: un conteo por color habría dado un falso positivo permanente.
 
-Las suites 4-7, 12-17, 19-22, 24, 27 y 29 se escribieron **primero que el código**
+Las suites 4-7, 12-17, 19-22, 24, 27, 29, 31 y 32 se escribieron **primero que el código**
 (TDD): cada una se vio fallar por el motivo correcto antes de implementar. La 11
 mide el **delta** contra la línea base porque la cornisa y el fondo ya son marrones
 y suman píxeles aunque no haya ninguna roca: medir absolutos habría dado un falso

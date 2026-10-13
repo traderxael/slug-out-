@@ -42,15 +42,16 @@ test de Node puede recorrer `victoria → historia → siguiente nivel` completo
 
 ---
 
-## Mapa de `index.html` (~2640 líneas)
+## Mapa de `index.html` (~2720 líneas)
 
 ### Datos y constantes
 | Línea | Qué |
 |---|---|
-| 121 | `NIVELES` — los **20** niveles de campana (nombre, nº de rivales, elementos, cofre) |
+| 121 | `NIVELES` — los **28** niveles de campana (nombre, nº de rivales, elementos, cofre; los del 25 al 28 llevan `anilloInvertido`) |
 | 121 | `FREQS` — tono de cada elemento |
-| 153 | `HISTORIA` — los **20** fragmentos de la mini historia (1-12 el viaje, 13-20 las consecuencias) |
-| ~140 | `ELEMENT_INFO`, `ELKEYS`, `RING` (qué elemento vence a cuál) |
+| 153 | `HISTORIA` — los **28** fragmentos (1-12 el viaje, 13-20 las consecuencias, 21-28 la fuente) |
+| ~95 | `RING` (qué elemento vence a cuál) · **`anilloAlReves`, `ventaja`, `avisoAnillo`** (del 25 al 28 el anillo se invierte) |
+| ~140 | `ELEMENT_INFO`, `ELKEYS` |
 
 ### Guardado y progresión
 197 `loadSave` · **209 `baseSave` (incluye `equipo`, las 3 del combate)** · **216
@@ -101,7 +102,8 @@ test de Node puede recorrer `victoria → historia → siguiente nivel` completo
 
 ## Recetas
 
-**Añadir un nivel de campana** → `NIVELES` (121) + un fragmento en `HISTORIA` (153). `test-niveles.cjs` exige que haya **exactamente uno por nivel** y que ninguno se repita.
+**Añadir un nivel de campana** → `NIVELES` (121) + un fragmento en `HISTORIA` (153). `test-niveles.cjs` exige que haya **exactamente uno por nivel** y que ninguno se repite.
+**Añadir un nivel con el anillo al revés** → `anilloInvertido:true` en el nivel; `ventaja()` ya lo respeta y el selector lo anuncia solo.
 El test `test-historia.cjs` falla si los dos no tienen el mismo largo: eso es a
 propósito, así el arco no se queda atrás del contenido.
 
