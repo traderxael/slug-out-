@@ -262,6 +262,45 @@ habilidad que prendés y te olvidás: es para el momento que elijas.
 Sin comprar nada el combate es idéntico al de siempre — las mejoras no
 desbalancean el juego, cambian qué podés elegir hacer.
 
+### 🌀 Modo infinito: la cueva sin fondo
+
+La campana termina en 28. El infinito no termina nunca, y por eso necesita su
+propia lectura — no alcanza con "más olas". Cuatro cosas lo hacen un modo propio:
+
+**Los arquetipos se presentan de a uno.** Como en la campana, y con el mismo
+principio: un arquetipo nuevo sin aviso se descubre *perdiendo tiros*. La ola 3
+presenta al **escudado**, la 5 al **frenético**, la 7 al **saltarín**, y cada
+presentación sale en un banner que dice qué es y qué hacer. Después se mezclan.
+
+**Tiene su mini historia: 8 fragmentos que dan vueltas.** Entran cada 7 olas, se
+pueden saltar como en la campana, y en el menú (**La cueva sin fondo**) se
+vuelven a leer en orden con `???` en lo no jugado. Como el modo no termina, la
+historia tampoco: al pasar los 8 vuelve el primero. Si se acabaran, el modo se
+quedaría sin nada que leer.
+
+**Del 25 en adelante el anillo se invierte cada 8 olas.**
+
+| Olas | Anillo |
+|---|---|
+| 1 – 24 | al derecho |
+| **25 – 32** | **al revés** |
+| 33 – 40 | al derecho |
+| **41 – 48** | **al revés** |
+
+Es un ciclo que se puede aprender, no un castigo permanente ni un número más
+grande. Se avisa al **entrar** en cada ciclo invertido (no en cada ola), y
+mientras dura queda marcado en el HUD.
+
+**Cierra el lazo con las mejoras.** Las gemas por ola crecen (`6 + ⌊ola×1.5⌋`, +15
+en las olas de jefe), así que farmear hondo rinde más — y lo que juntás se
+convierte en las mejoras de siempre. Al caer, el resumen te dice cuánto te dio
+cada mejora y **cuánto falta para la siguiente**, para que la partida no termine
+en "perdiste en la ola X" sino en "le faltan 240 💎 al escudo".
+
+La dificultad tampoco es solo más HP: **la ráfaga crece** (1 → 4, con tope), y
+todos los topes son honestos — siempre queda una pausa entre andanadas, porque
+sin pausa no hay nada que leer.
+
 ## ⚔️ Elementos
 
 | Elemento | Habilidad | ULTI |
@@ -399,6 +438,15 @@ node test-mejoras.cjs
 #     y activar el escudo y el fuego rapido con las teclas E y F en combate
 
 "C:/Users/USUARIO/AppData/Local/Programs/Python/Python312/python.exe" test-mejoras-browser.py
+
+# 35. El modo infinito como modo propio: ciclos del anillo, arquetipos
+#     presentados de a uno, la historia que da vueltas y el lazo con las mejoras
+node test-infinito.cjs
+
+# 36. El modo infinito EN JUEGO (Edge real): el boton del menu, volver a leer los
+#     fragmentos con ??? en lo no jugado, y el combate arrancando en la ola 1
+
+"C:/Users/USUARIO/AppData/Local/Programs/Python/Python312/python.exe" test-infinito-browser.py
 ```
 
 La suite 16 no cuenta píxeles: usa el modo de grabación del harness
@@ -407,7 +455,7 @@ La suite 16 no cuenta píxeles: usa el modo de grabación del harness
 porque el escudo cian `(127,212,255)` y el proyectil de hielo `#6fd6e6` son casi el mismo
 tono: un conteo por color habría dado un falso positivo permanente.
 
-Las suites 4-7, 12-17, 19-22, 24, 27, 29, 31, 32, 33 y 34 se escribieron **primero que el código**
+Las suites 4-7, 12-17, 19-22, 24, 27, 29, 31-36 se escribieron **primero que el código**
 (TDD): cada una se vio fallar por el motivo correcto antes de implementar. La 11
 mide el **delta** contra la línea base porque la cornisa y el fondo ya son marrones
 y suman píxeles aunque no haya ninguna roca: medir absolutos habría dado un falso

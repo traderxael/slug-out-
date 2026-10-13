@@ -96,30 +96,44 @@ function buildGame(opts){
   let src = m[1];
 
   // Hook de exportacion, inyectado dentro del IIFE justo antes de su cierre.
-  const hook = `
-;globalThis.__G = {
-  get state(){ return state; },
-  get save(){ return save; },
-  update, draw, fire, iniciar, detenerJuego, nuevoEstado,
-  W, H, LX, LY, SELECTOR_Y, LEDGE_Y, FLOOR_Y, GRAV, V0, VEL,
-  POWER_MIN, POWER_MAX, ELEMENT_INFO, ELKEYS, NIVELES,
-  applyHit, addParticles, muzzlePos, vel, cooldownFor,
-  cargaMaxima, powerMult,
+  // Los nombres se resuelven con eval dentro de un try: si el juego todavia no
+  // tiene una funcion (feature nueva en RED), se publica undefined en vez de
+  // tirar ReferenceError. Asi el RED es legible — se ven TODAS las que faltan —
+  // y no muere en la primera.
+  const NOMBRES = [
+    'update','draw','fire','iniciar','detenerJuego','nuevoEstado',
+    'W','H','LX','LY','SELECTOR_Y','LEDGE_Y','FLOOR_Y','GRAV','V0','VEL',
+    'POWER_MIN','POWER_MAX','ELEMENT_INFO','ELKEYS','NIVELES',
+    'applyHit','addParticles','muzzlePos','vel','cooldownFor','cargaMaxima','powerMult',
+    'HISTORIA','mostrarHistoria','ganarNivel',
+    'arquetipoDe','arquetipoInfinito','enemigoNivel','enemigoInfinito','crearEnemigo',
+    'equipoActual','baseSave','normalizeSave','mejorRareza','renderMenu',
+    'toggleEquipo','renderEquipo','EQUIPO_MAX',
+    'statsNivel','LOGROS','COFRES',
+    'vence','ventaja','renderNiveles','avisoAnillo','anilloAlReves',
+    'avisoArquetipoInfinito','OLAS_HISTORIA','historiaInfinito','fragmentoInfinito',
+    'mostrarHistoriaInfinito','gemasPorOla','resumenMejoras','histInfVistas',
+    'renderHistoriaInfinito','renderHistoria','histVistas','avisoInfinito',
+    'esOlaHistoria','siguienteMejora','HISTORIA_INF',
+    'MEJORA_MAX','costoMejora','armaDano','armaCd','babosaDano','escudoDur','rapidDur',
+    'usosEscudo','usosRapid','comprarMejora','danoAlJugador','usarEscudo','usarRapid',
+    'renderMejoras'
+  ];
+  const hook = `;(function(){
     // El hook se inyecta DENTRO del IIFE, asi que solo ve lo que esta en su
     // ambito. El stub de documento vive afuera: se le cuelga despues para que los
     // tests puedan disparar clics sobre el overlay.
-    HISTORIA, mostrarHistoria, ganarNivel,
-    arquetipoDe, arquetipoInfinito, enemigoNivel, enemigoInfinito, crearEnemigo,
-    equipoActual, baseSave, normalizeSave, mejorRareza, renderMenu,
-    toggleEquipo, renderEquipo, EQUIPO_MAX,
-    statsNivel, LOGROS, COFRES,
-    vence, ventaja, renderNiveles, avisoAnillo,
-    MEJORA_MAX, costoMejora, armaDano, armaCd, babosaDano, escudoDur, rapidDur,
-    usosEscudo, usosRapid, comprarMejora, danoAlJugador, usarEscudo, usarRapid,
-    renderMejoras,
-    renderHistoria, histVistas,
-    get overlayHTML(){ return overlayEl.innerHTML; }
-};`;
+    const __G = {};
+    ${JSON.stringify(NOMBRES)}.forEach(function(n){
+      try { __G[n] = eval(n); } catch(e){ __G[n] = undefined; }
+    });
+    // state y save son vivos (el juego los reasigna): getters, no copias.
+    Object.defineProperty(__G, 'state', { get: function(){ return state; } });
+    Object.defineProperty(__G, 'save',  { get: function(){ return save; } });
+    try { Object.defineProperty(__G, 'overlayHTML', { get: function(){ return overlayEl.innerHTML; } }); }
+    catch(e){}
+    globalThis.__G = __G;
+  })();`;
   const close = src.lastIndexOf('})();');
   if (close < 0) throw new Error('no encontre el cierre del IIFE');
   src = src.slice(0, close) + hook + src.slice(close);
