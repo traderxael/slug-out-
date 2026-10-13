@@ -48,8 +48,8 @@ async def main():
         check("la pagina carga en produccion", await p.locator("#c").count() == 1)
         check("el menu esta visible", await p.evaluate(
             "() => document.getElementById('overlay').style.display !== 'none'"))
-        check("el menu publica los 27 logros",
-              (await p.locator("#btnLogros").inner_text()) == "Logros 0/27",
+        check("el menu publica los 29 logros",
+              (await p.locator("#btnLogros").inner_text()) == "Logros 0/29",
               await p.locator("#btnLogros").inner_text())
 
         def pt(cx, cy):                       # coords de juego -> pixeles de pantalla
