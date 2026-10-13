@@ -42,7 +42,7 @@ test de Node puede recorrer `victoria → historia → siguiente nivel` completo
 
 ---
 
-## Mapa de `index.html` (~2720 líneas)
+## Mapa de `index.html` (~2800 líneas)
 
 ### Datos y constantes
 | Línea | Qué |
@@ -94,9 +94,23 @@ test de Node puede recorrer `victoria → historia → siguiente nivel` completo
 ### Estado, loop y pantallas
 1872 `draw` · 1954 `loop` · 2010 `programarFin` · 2054 `iniciar` ·
 **2067 `ganarNivel` (donde se engancha la mini historia)** · 2114 `endGame` ·
-2197 `renderMenu` (botón **Equipo** con el contador) · 2226 `renderNiveles` ·
-2237 `renderCofres` · **2425 `renderEquipo` (el selector de babosas)** · 2381
-`renderAyuda`
+2197 `renderMenu` (botones **Equipo** y **Mejoras**) · 2226 `renderNiveles` ·
+2237 `renderCofres` · **2425 `renderEquipo` (el selector de babosas)** · **2571
+`renderMejoras` (la pantalla de comprar)** · 2381 `renderAyuda`
+
+### Mejoras (las gemas como progreso)
+`MEJORA_MAX` (5) · `costoMejora(clave, nivel)` (base 150 habilidades / 60 arma y
+babosa, paso 110 / 45) · `armaDano(n)` (1+0.06n) · `armaCd(n)` (1−0.04n) ·
+`babosaDano(elKey)` · `escudoDur` / `rapidDur` / `usosEscudo` / `usosRapid` (usos
+por combate = nivel de la mejora) · `comprarMejora` (única puerta: valida, cobra y
+sube) · **`danoAlJugador(n)`** — el único camino por donde entra el daño al
+jugador (rocas y escupitajos van por acá); con el escudo activo gasta 250ms,
+saca partícula 'BLOQUEADO' y **devuelve 0** · `usarEscudo` / `usarRapid` · los
+timers `escudoLeft` / `rapidLeft` bajan en `update`; `cooldownFor` multiplica por
+`armaCd()` y por 0.5 mientras `rapidLeft > 0`; `applyHit` multiplica por
+`armaDano()` y por `babosaDano(elKey)`. Teclas `E` y `F`, HUD 🛡️/⚡ con usos y
+segundos restantes. `save.mejoras` sobrevive el guardado; `normalizeSave` lo sanea
+al tope y los saves viejos arrancan en 0.
 
 ---
 

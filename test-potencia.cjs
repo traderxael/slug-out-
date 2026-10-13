@@ -17,7 +17,12 @@ if (!dmgLine) { console.error('FALLO: no se encontró la fórmula de daño'); pr
 console.log('fórmula de daño real:', dmgLine[0], '\n');
 
 const sandbox = {};
-new Function('exports', code + '\nexports.POWER_MIN=POWER_MIN;exports.POWER_MAX=POWER_MAX;' +
+// cooldownFor ahora multiplica por armaCd() (las mejoras del arma) y por 0.5 si
+// el fuego rapido esta activo. Esta suite mide el tradeoff BASE — o sea sin
+// ninguna mejora ni habilidad comprada —, por eso los stubs: armaCd sin mejora y
+// el fuego rapido apagado. Cada uno tiene su propio test en test-mejoras.cjs.
+new Function('exports', code + '\nvar state;\nfunction armaCd(){ return 1; }\n' +
+  'exports.POWER_MIN=POWER_MIN;exports.POWER_MAX=POWER_MAX;' +
   'exports.powerFromDrag=powerFromDrag;exports.cooldownFor=cooldownFor;' +
   'exports.cargaMaxima=cargaMaxima;exports.powerMult=powerMult;')(sandbox);
 const { POWER_MIN, POWER_MAX, powerFromDrag, cooldownFor, cargaMaxima, powerMult } = sandbox;

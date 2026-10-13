@@ -30,6 +30,9 @@
   .lv b{font-size:15px;font-weight:600;}
   .lv:disabled{opacity:.32;cursor:default;}
   .st{color:var(--accent);letter-spacing:1px;}
+  .mej{display:flex;align-items:center;justify-content:space-between;gap:10px;width:100%;max-width:330px;
+       background:rgba(255,255,255,.04);border:1px solid var(--line);border-radius:8px;padding:8px 10px;margin:4px 0;}
+  .mej h3{margin:0;}
   .fila{display:flex;gap:8px;justify-content:center;width:100%;}
   .cofre{flex:1;display:flex;flex-direction:column;align-items:center;gap:5px;font-size:12px;color:var(--dim);}
   .btnS{padding:6px 10px;font-size:12px;border-radius:6px;}
@@ -111,6 +114,53 @@
   // el combate. TDD: test-niveles.cjs seccion 8.
   function avisoAnillo(L){
     return anilloAlReves(L) ? '⟲ El anillo está al revés' : '';
+  }
+  // ======== MEJORAS (se compran con gemas) ========
+  // Dos pistas permanentes (arma y babosas) y dos habilidades que se USAN en
+  // combate (escudo y fuego rapido). Todo tiene tope: una mejora que no tiene
+  // techo deja de ser una decision y pasa a ser una obligacion.
+  const MEJORA_MAX = 5;
+  // Costo: sube con el nivel. Las habilidades cuestan mas que el arma porque
+  // ademas de numeros te dan una herramienta nueva por combate.
+  function costoMejora(clave, nivel){
+    const base = (clave==='escudo' || clave==='rapidfire') ? 150 : 60;
+    const paso = (clave==='escudo' || clave==='rapidfire') ? 110 : 45;
+    return base + paso*(nivel||0);
+  }
+  // El arma: +6% de dano y -4% de recarga por nivel. Al tope (5) es +30% de
+  // dano y -20% de recarga: se nota, y no convierte el juego en spam.
+  function armaDano(n){ const l = (n==null) ? save.mejoras.arma : n; return 1 + 0.06*Math.max(0, Math.min(MEJORA_MAX, l)); }
+  function armaCd(n){ const l = (n==null) ? save.mejoras.arma : n; return 1 - 0.04*Math.max(0, Math.min(MEJORA_MAX, l)); }
+  // Cada babosa: +8% de dano de SU elemento. Si no la tenes, no cuenta — no
+  // tiene sentido mejorar algo que no podes cargar.
+  function babosaDano(el){
+    const l = save.mejoras.babosas[el] || 0;
+    if(!save.tiene[el] || !save.tiene[el].some(v=>v>0)) return 1;
+    return 1 + 0.08*Math.max(0, Math.min(MEJORA_MAX, l));
+  }
+  // Las habilidades: nivel = usos por combate, y cada nivel dura mas.
+  function usosEscudo(){ return save.mejoras.escudo || 0; }
+  function usosRapid(){ return save.mejoras.rapidfire || 0; }
+  function escudoDur(n){ const l = (n==null) ? save.mejoras.escudo : n; return 2500 + 400*Math.max(0, Math.min(MEJORA_MAX, l)); }
+  function rapidDur(n){ const l = (n==null) ? save.mejoras.rapidfire : n; return 3000 + 400*Math.max(0, Math.min(MEJORA_MAX, l)); }
+  // Comprar: gasta gemas, y no deja comprar sin gemas ni pasado el tope.
+  // Devuelve false en los dos casos, asi la pantalla puede avisar por que.
+  function comprarMejora(clave){
+    if(clave==='babosa' || ELKEYS.indexOf(clave)>=0){
+      const el = clave;
+      if(!save.tiene[el] || !save.tiene[el].some(v=>v>0)) return false;   // no la tenes
+      const l = save.mejoras.babosas[el] || 0;
+      if(l >= MEJORA_MAX) return false;
+      const c = costoMejora('babosa', l);
+      if(save.gemas < c) return false;
+      save.gemas -= c; save.mejoras.babosas[el] = l+1; saveGame(); return true;
+    }
+    if(['arma','escudo','rapidfire'].indexOf(clave) < 0) return false;
+    const l = save.mejoras[clave] || 0;
+    if(l >= MEJORA_MAX) return false;
+    const c = costoMejora(clave, l);
+    if(save.gemas < c) return false;
+    save.gemas -= c; save.mejoras[clave] = l+1; saveGame(); return true;
   }
   // 5 rarezas (nueva: LEGENDARIA)
   const RAREZA = [
@@ -293,7 +343,13 @@
       stats:{ partidas:0, combos:0, cofresAbiertos:0, babosas:0, jefes:0, ultis:0, danoTotal:0, criticos:0, cargasMax:0 },
       logros:{}, racha:{ dias:0, ultima:'' }, desafios:{ fecha:'', lista:[] }, mute:false,
       // Las 3 babosas con las que entras al combate. Se eligen en el selector.
-      equipo:['fuego','agua','tierra']
+      equipo:['fuego','agua','tierra'],
+      // ---- mejoras (se compran con gemas) ----
+      // arma: dano y recarga del lanzador. babosas: dano por elemento, y solo
+      // cuenta si la tenes. escudo y rapidfire: habilidades que se USAN en
+      // combate, con usos por combate segun el nivel.
+      mejoras:{ arma:0, escudo:0, rapidfire:0,
+                babosas:(function(){ const b={}; ELKEYS.forEach(el=>b[el]=0); return b; })() }
     };
   }
   function normalizeSave(s){
@@ -310,6 +366,18 @@
     if(s.racha && typeof s.racha==='object'){ if(typeof s.racha.dias==='number'&&s.racha.dias>=0) o.racha.dias=Math.floor(s.racha.dias); if(typeof s.racha.ultima==='string') o.racha.ultima=s.racha.ultima; }
     if(s.desafios && typeof s.desafios==='object'){ if(typeof s.desafios.fecha==='string') o.desafios.fecha=s.desafios.fecha; if(Array.isArray(s.desafios.lista)) o.desafios.lista=s.desafios.lista.filter(d=>d&&typeof d.id==='string'); }
     if(typeof s.mute==='boolean') o.mute = s.mute;
+    // ---- mejoras: se sanan al tope, nunca se acepta un numero absurdo ----
+    // Un save viejo no trae mejoras: arranca en 0 y el juego sigue igual.
+    if(s.mejoras && typeof s.mejoras==='object'){
+      ['arma','escudo','rapidfire'].forEach(k=>{
+        const v = s.mejoras[k];
+        if(typeof v==='number' && v>=1) o.mejoras[k] = Math.min(MEJORA_MAX, Math.floor(v));
+      });
+      if(s.mejoras.babosas && typeof s.mejoras.babosas==='object'){
+        ELKEYS.forEach(el=>{ const v = s.mejoras.babosas[el];
+          if(typeof v==='number' && v>=1) o.mejoras.babosas[el] = Math.min(MEJORA_MAX, Math.floor(v)); });
+      }
+    }
     // ---- equipo: solo babosas que tengas, sin repetir, maximo 3 ----
     // Un save viejo no trae el campo, y uno corrupto puede traer cualquier
     // cosa: en los dos casos cae a las primeras 3 de la mochila. Nunca queda
@@ -466,7 +534,7 @@
     const t = Math.max(0, Math.min(1, (d-26)/150));
     return POWER_MIN + (POWER_MAX-POWER_MIN)*t;
   }
-  function cooldownFor(p){ return Math.round(300 + 320*p); }
+  function cooldownFor(p){ return Math.round((300 + 320*p)*armaCd()*(state && state.rapidLeft>0 ? 0.5 : 1)); }
   function cargaMaxima(p){ return p >= POWER_MAX-0.02; }
   function powerMult(p){ return 0.55 + 0.45*p; }
   function muzzlePos(ang){ return {x:LX+Math.cos(ang)*32, y:LY+Math.sin(ang)*32}; }
@@ -712,6 +780,9 @@
   function sfxWin(){ noise(0.5,'lowpass',900,90,0.25); beep(660,0.12,'sine',0.1); setTimeout(()=>beep(880,0.18,'sine',0.1),110); }
   function sfxLose(){ beep(220,0.3,'sawtooth',0.12); noise(0.4,'lowpass',600,60,0.3); }
   function sfxUlti(){ beep(80,0.4,'sawtooth',0.2); setTimeout(()=>beep(200,0.3,'sine',0.18),80); setTimeout(()=>beep(440,0.25,'sine',0.16),200); noise(0.6,'lowpass',1200,200,0.3); }
+  function sfxEscudo(){ beep(660,0.12,'sine',0.14); setTimeout(()=>beep(990,0.18,'sine',0.12),70); }
+  function sfxBloqueo(){ beep(1320,0.05,'square',0.07); }
+  function sfxRapido(){ beep(520,0.06,'square',0.1); setTimeout(()=>beep(780,0.06,'square',0.09),55); setTimeout(()=>beep(1040,0.08,'square',0.08),110); }
 
   function showOverlay(html){ overlayEl.innerHTML = '<div class="col">'+html+'</div>'; overlayEl.style.display = 'flex'; overlayEl.scrollTop = 0; }
   function hideOverlay(){ overlayEl.style.display = 'none'; }
@@ -902,6 +973,11 @@
       cooldown:0, cooldownMax:480, recoil:0, aimAngle:-Math.PI/2, aimPower:1, waveTransition:0, combo:0, maxCombo:0, comboT:0, score:0, shake:0, flash:0,
       cofresRun:0, bannerT:2400, rocaTimer:2600,
       ultiCharge:0, ultiMax:100, ultiFxT:0, eclipseLeft:0,
+      // Habilidades compradas: usos de este combate y lo que queda de cada una.
+      // Los usos salen de las mejoras, asi que sin comprarlas el combate es
+      // exactamente el de siempre.
+      usos:{ escudo: usosEscudo(), rapidfire: usosRapid() },
+      escudoLeft:0, rapidLeft:0,
       bannerText: modo==='nivel' ? 'Nivel '+L : 'Modo infinito',
       bannerSub: modo==='nivel' ? NIVELES[L-1].nombre : 'Aguanta todas las olas que puedas'
     };
@@ -963,6 +1039,10 @@
     if(state.bannerT>0) state.bannerT = Math.max(0, state.bannerT-dt);
     if(state.ultiFxT>0) state.ultiFxT = Math.max(0, state.ultiFxT-dt);
     if(state.eclipseLeft>0) state.eclipseLeft = Math.max(0, state.eclipseLeft-dt);
+    // Las dos habilidades compradas caducan solas: un escudo o un x2 que no
+    // tuvieran fin dejarian de ser una decision de cuando usarlas.
+    if(state.escudoLeft>0) state.escudoLeft = Math.max(0, state.escudoLeft-dt);
+    if(state.rapidLeft>0) state.rapidLeft = Math.max(0, state.rapidLeft-dt);
     // el combo caduca si dejás de acertar: mantenerlo es una decisión
     if(state.combo>0 && state.comboT>0){
       state.comboT -= dt;
@@ -1000,7 +1080,10 @@
     const critMult = isCrit ? 1.5 : 1;
     const rm = RAREZA[r].mult * (elKey==='rayo' ? 0.9 : 1);
     const eclipseMult = state.eclipseLeft>0 ? 3 : 1;
-    const dmg = Math.round(16*mult*comboMult*critMult*rm*eclipseMult*powerMult(pw)*(max?1.25:1));
+    // Las mejoras del arma y de la babosa entran multiplicando, igual que la
+    // rareza o la potencia: una mejora no cambia la formula, la escala.
+    const dmg = Math.round(16*mult*comboMult*critMult*rm*eclipseMult*powerMult(pw)*(max?1.25:1)
+                          *armaDano()*babosaDano(elKey));
     en.hp = Math.max(0, en.hp-dmg);
     // El frenetico se enfurece al cruzar la mitad de la vida: el combate cambia
     // de ritmo justo cuando el jugador cree que lo tiene controlado. Es una
@@ -1078,6 +1161,50 @@
     });
     addParticles(x, 40, '#a08b6d', 6, 'tierra');
     beep(300, 0.05, 'triangle', 0.04);      // cue del tell
+  }
+
+  // ======== HABILIDADES DE MEJORA: escudo y fuego rapido ========
+  // Las dos se COMPRAN con gemas (nivel = usos por combate) y se USAN con E y
+  // F. Ninguna es automática: el jugador decide cuándo, igual que la ULTI.
+  // El escudo FRENA el daño en vez de absorber una cantidad: mientras está
+  // puesto no pasa nada, y cada golpe que frena lo gasta un poco — así usarlo
+  // en el momento de la andanada rinde más que dejarlo prendido de entrada.
+  function danoAlJugador(n){
+    if(state && state.escudoLeft>0){
+      state.escudoLeft = Math.max(0, state.escudoLeft - 250);
+      state.shake = Math.max(state.shake, 6);
+      addTextParticle(LX, LY-32, 'BLOQUEADO', '#7fd4ff', 12);
+      addParticles(LX, LY-6, '#7fd4ff', 8, 'hielo');
+      sfxBloqueo();
+      return 0;
+    }
+    return n;
+  }
+  function usarEscudo(){
+    if(!state || gameState!=='playing') return false;
+    if(state.usos.escudo <= 0 || state.escudoLeft > 0) return false;
+    state.usos.escudo--;
+    state.escudoLeft = escudoDur();
+    addTextParticle(LX, LY-52, '🛡️ ESCUDO', '#7fd4ff', 14);
+    save.stats.escudos = (save.stats.escudos||0)+1;
+    actualizarDesafios('escudos', 1);
+    sfxEscudo();
+    return true;
+  }
+  // Fuego rapido: la recarga cae a la mitad mientras dura. Es un compromiso de
+  // tempo — tirar mas seguido tira menos potente cada tiro, porque la potencia
+  // se sube manteniendo y aca el tiempo de carga no alcanza.
+  function usarRapid(){
+    if(!state || gameState!=='playing') return false;
+    if(state.usos.rapidfire <= 0 || state.rapidLeft > 0) return false;
+    state.usos.rapidfire--;
+    state.rapidLeft = rapidDur();
+    state.cooldown = Math.min(state.cooldown, cooldownFor(state.aimPower||1));
+    addTextParticle(LX, LY-52, '⚡ x2 DISPARO', '#ffd700', 14);
+    save.stats.rapidos = (save.stats.rapidos||0)+1;
+    actualizarDesafios('rapidos', 1);
+    sfxRapido();
+    return true;
   }
 
   // ======== HABILIDAD DEFINITIVA ========
@@ -1358,7 +1485,7 @@
       // sola vez, y de ahi en mas solo cae hasta el piso.
       if(!ro.golpeo && ro.y >= LY-10 && Math.abs(ro.x - LX) < 34){
         ro.golpeo = true;
-        state.player.hp = Math.max(0, state.player.hp - 12);
+        state.player.hp = Math.max(0, state.player.hp - danoAlJugador(12));
         state.shake = Math.max(state.shake, 8);
         addParticles(LX, LY-6, '#a08b6d', 12, 'tierra');
         addTextParticle(LX, LY-30, '-12', '#ff5f6d', 12);
@@ -1565,7 +1692,7 @@
       s.x += s.vx*dt; s.y += s.vy*dt;
       s.trail.push({x:s.x,y:s.y}); if(s.trail.length>8) s.trail.shift();
       if(s.y >= LY-10){
-        state.player.hp = Math.max(0, state.player.hp-s.dmg);
+        state.player.hp = Math.max(0, state.player.hp - danoAlJugador(s.dmg));
         state.shake = 10; state.flash = 1;
         addParticles(LX, LY-6, s.color, 12, s.el);
         sfxHitPlayer();
@@ -2107,6 +2234,18 @@
         ctx.fillStyle = '#ff9ad5'; ctx.font = '9px sans-serif';
         ctx.fillText('⟲ anillo al revés', W/2, 46);
       }
+      // Las habilidades compradas: cuantos usos quedan, y si alguna está
+      // prendida con cuanto tiempo. Se lee de un vistazo sin abrir nada.
+      const partes = [];
+      if(state.usos && state.usos.escudo>0)
+        partes.push('🛡️ '+state.usos.escudo + (state.escudoLeft>0 ? ' · '+Math.ceil(state.escudoLeft/1000)+'s' : ''));
+      if(state.usos && state.usos.rapidfire>0)
+        partes.push('⚡ '+state.usos.rapidfire + (state.rapidLeft>0 ? ' · '+Math.ceil(state.rapidLeft/1000)+'s' : ''));
+      if(partes.length){
+        ctx.fillStyle = state.escudoLeft>0 ? '#7fd4ff' : (state.rapidLeft>0 ? '#ffd700' : UI.dim);
+        ctx.font = '9px sans-serif';
+        ctx.fillText(partes.join('   ·   '), W/2, 58);
+      }
       if(state.combo>1){
         ctx.fillStyle = UI.accent; ctx.font = '500 10px sans-serif';
         ctx.fillText('Combo x'+state.combo, W/2, 34);
@@ -2427,6 +2566,7 @@
       +'<p style="font-size:12px;color:#ffd700;">'+rachaTxt+'</p>'
       +'<button class="btn" id="btnNiveles">Niveles</button>'
     +'<button class="btnAlt" id="btnEquipo">🐌 Equipo · '+equipoActual().length+'/'+EQUIPO_MAX+'</button>'
+    +'<button class="btnAlt" id="btnMejoras">🔧 Mejoras</button>'
     +'<button class="btnAlt" id="btnHistoria">📖 Ruta de la cueva · '+histVistas()+'/'+Object.keys(HISTORIA).length+'</button>'
       +'<button class="btn btnAlt" id="btnInfinito">Modo infinito</button>'
       +'<button class="btn btnAlt" id="btnCofres">Cofres'+(n?' ('+n+')':'')+'</button>'
@@ -2439,6 +2579,7 @@
     );
     bind('btnNiveles', renderNiveles);
     bind('btnEquipo', renderEquipo);
+    bind('btnMejoras', renderMejoras);
     bind('btnHistoria', renderHistoria);
     bind('btnInfinito', ()=>iniciar('infinito'));
     bind('btnCofres', renderCofres);
@@ -2446,6 +2587,63 @@
     bind('btnDesafios', renderDesafios);
     bind('btnLogros', renderLogros);
     bind('btnAyuda', renderAyuda);
+  }
+  function renderMejoras(){
+    detenerJuego();
+    const fila = (clave, titulo, desc, nivel, extra) => {
+      const alTope = nivel >= MEJORA_MAX;
+      const c = costoMejora(clave, nivel);
+      const puede = !alTope && save.gemas >= c;
+      return '<div class="mej"><div><b>'+titulo+'</b> <span style="color:#ffd700;">'+'★'.repeat(nivel)+'☆'.repeat(MEJORA_MAX-nivel)+'</span>'
+        +'<div style="font-size:11px;color:#9aa3a8;">'+desc+'</div>'
+        +(extra ? '<div style="font-size:11px;color:#6ad4ff;">'+extra+'</div>' : '')
+        +'</div>'
+        +(alTope ? '<div style="color:#7fb87f;font-size:12px;">al máximo</div>'
+                : '<button class="btn btnS" id="mej_'+clave+'"'+(puede?'':' disabled')+'>'+c+' 💎</button>')
+        +'</div>';
+    };
+    let html = '<h2>🔧 Mejoras</h2>'
+      +'<p style="font-size:12px;color:#6ad4ff;">Gemas: <b>'+save.gemas+'</b></p>'
+      +'<p style="font-size:11px;color:#9aa3a8;">Las gemas salen de ganar niveles, cofres y logros. Cada mejora tiene tope: pasando el tope no suma nada.</p>'
+      // --- el arma ---
+      +'<h3 style="margin:10px 0 4px;">🔫 El arma</h3>'
+      +fila('arma', 'Lanzador', 'Más daño y recarga más rápida, en todos los combates.',
+            save.mejoras.arma,
+            '+'+Math.round((armaDano()-1)*100)+'% daño · recarga '+Math.round((1-armaCd())*100)+'% más rápida')
+      // --- las babosas ---
+      +'<h3 style="margin:10px 0 4px;">🐌 Babosas</h3>'
+      +'<p style="font-size:11px;color:#9aa3a8;">Solo podés mejorar las que tengas en la mochila.</p>';
+    ELKEYS.forEach(el=>{
+      const laTengo = save.tiene[el] && save.tiene[el].some(v=>v>0);
+      if(!laTengo) return;
+      const niv = save.mejoras.babosas[el]||0;
+      const filaBab = (function(){
+        const alTope = niv >= MEJORA_MAX, c = costoMejora('babosa', niv);
+        return '<div class="mej"><div><b><span style="color:'+ELEMENT_INFO[el].color+';">'+ELEMENT_INFO[el].nombre+'</span></b> '
+          +'<span style="color:#ffd700;">'+'★'.repeat(niv)+'☆'.repeat(MEJORA_MAX-niv)+'</span>'
+          +'<div style="font-size:11px;color:#9aa3a8;">+'+(alTope ? (MEJORA_MAX*8) : ((niv+1)*8))+'% de daño al tirar con '+ELEMENT_INFO[el].nombre.toLowerCase()+(alTope?'':' (subiendo de '+(niv*8)+'%)')+'</div></div>'
+          +(alTope ? '<div style="color:#7fb87f;font-size:12px;">al máximo</div>'
+                  : '<button class="btn btnS" id="mej_'+el+'"'+(save.gemas>=c?'':' disabled')+'>'+c+' 💎</button>')
+          +'</div>';
+      })();
+      html += filaBab;
+    });
+    // --- las habilidades ---
+    html += '<h3 style="margin:10px 0 4px;">✨ Habilidades que usás en combate</h3>'
+      +'<p style="font-size:11px;color:#9aa3a8;">Se compran una vez y se recargan solas en cada combate: el nivel es la cantidad de usos.</p>'
+      +fila('escudo', '🛡️ Escudo', 'Frena todo el daño mientras esté puesto. Cada golpe que frena lo gasta un poco.',
+            save.mejoras.escudo,
+            'tecla E' + (save.mejoras.escudo>0 ? ' · '+usosEscudo()+' uso'+(usosEscudo()>1?'s':'')+' por combate · '+(escudoDur()/1000).toFixed(1)+'s' : ''))
+      +fila('rapidfire', '⚡ Fuego rápido', 'La recarga cae a la mitad: tirás al doble de velocidad mientras dura.',
+            save.mejoras.rapidfire,
+            'tecla F' + (save.mejoras.rapidfire>0 ? ' · '+usosRapid()+' uso'+(usosRapid()>1?'s':'')+' por combate · '+(rapidDur()/1000).toFixed(1)+'s' : ''));
+    showOverlay(html+'<button class="btn btnAlt" id="btnVolver">Volver</button>');
+    ELKEYS.forEach(el=>{
+      const laTengo = save.tiene[el] && save.tiene[el].some(v=>v>0);
+      if(laTengo) bind('mej_'+el, ()=>{ comprarMejora(el); renderMejoras(); });
+    });
+    ['arma','escudo','rapidfire'].forEach(k=> bind('mej_'+k, ()=>{ comprarMejora(k); renderMejoras(); }));
+    bind('btnVolver', renderMenu);
   }
   function renderNiveles(){
     detenerJuego();
@@ -2664,7 +2862,8 @@
       +'<p style="text-align:left;font-size:12px;color:#b9a6e8;"><b>🎨 La habilidad de su elemento</b><br>Cada villano usa contra vos <b>la habilidad de SU elemento</b>, igual que tus babosas. El anillo de carga se pinta del color del elemento, así que <b>leés cuál viene</b> antes de que salga:<br>· <b>🔥 Fuego</b>: charco ardiente bajo tus pies que te quema<br>· <b>💧 Agua</b>: marea que te alarga la recarga<br>· <b>🪨 Tierra</b>: te aturde — no disparás, pero conservás la carga<br>· <b>🌪️ Aire</b>: abanico de 3 tiros perforantes<br>· <b>❄️ Hielo</b>: te congela — no disparás <b>y te baja la carga</b><br>· <b>⚡ Rayo</b>: descarga doble, el primero avisa el segundo<br>· <b>🌿 Planta</b>: se regenera y te enreda<br>· <b>🌑 Sombra</b>: te roba vida y se cura con ella</p>'
       +'<p style="text-align:left;font-size:12px;color:#b9a6e8;"><b>📖 La historia de la campana</b><br>Tras cada combate ganado, un pedazo de historia cuenta qué pasa en la cueva y por qué la estás recorriendo. El arco se lee con los elementos: el fuego que seca, el hielo que conserva, la sombra que drena. Son <b>28 fragmentos</b>: los 12 primeros son el viaje hasta la verdad, del 13 al 20 las consecuencias de haber abierto la cueva, y del 21 al 28 el descenso hasta la fuente — donde se descubre que el anillo nunca fue una ley. Si no te interesa, <b>Saltar</b> y listo. Cuando quieras, en el menú está <b>Ruta de la cueva</b> para volver a leerlos en orden.</p>'
       +'<p style="text-align:left;font-size:12px;color:#8fd68a;"><b>🐌 Tu equipo de combate</b><br>Tenés una mochila con babosas, pero al combate entran <b>solo 3</b>. En el menú, <b>Equipo</b> abre el selector: tocá una babosa de la mochila para meterla, y tocá una del equipo para sacarla. Las marcadas llevan el borde de su color. Cuando el equipo está lleno las demás se apagan: hay que sacar una antes de meter otra. El equipo queda guardado, así que elegís una vez y peleás siempre con esas 3. En combate cambiás entre ellas con el selector de abajo o las teclas <b>1, 2 y 3</b>.</p>'
-      +'<p style="text-align:left;font-size:12px;color:#6ad4ff;"><b>Teclado (PC)</b><br>← → apuntar · ↑ ↓ potencia · Espacio disparar · 1-3 elemento · U ULTI · P pausa · M sonido · R reiniciar</p>'
+      +'<p style="text-align:left;font-size:12px;color:#7fd4ff;"><b>🔧 Mejoras</b><br>Las gemas no solo abren cofres: en el menú, <b>Mejoras</b> las convierte en progreso permanente. Cuatro cosas, todas con tope de 5:<br>· <b>🔫 El arma</b>: +6% de daño y −4% de recarga por nivel, en todos los combates.<br>· <b>🐌 Cada babosa</b>: +8% de daño al tirar con ella. Solo podés mejorar las que tengas.<br>· <b>🛡️ Escudo</b> (tecla E): frena todo el daño mientras esté puesto. Cada golpe que frena lo gasta un poco, así que usarlo justo en la andanada rinde más que dejarlo prendido de entrada.<br>· <b>⚡ Fuego rápido</b> (tecla F): la recarga cae a la mitad. Tirás al doble de velocidad, pero cada tiro sale menos cargado.</p>'
+      +'<p style="text-align:left;font-size:12px;color:#6ad4ff;"><b>Teclado (PC)</b><br>← → apuntar · ↑ ↓ potencia · Espacio disparar · 1-3 elemento · U ULTI · <b>E escudo</b> · <b>F fuego rápido</b> · P pausa · M sonido · R reiniciar</p>'
       +'<p style="text-align:left;font-size:11px;">'+ventajas+'</p>'
       +'<p style="text-align:left;font-size:11px;">'+habil+'</p>'
       +'<p>Cada nivel termina con un Guardián. Ganás gemas y cofres. Los enemigos pueden <b>esquivar</b>: <b>avisan</b> antes con un anillo naranja, y si les acertás en esa ventana la esquiva se cancela. El <b>combo</b> caduca a los 5 segundos sin acertar.</p>'
@@ -2693,6 +2892,9 @@
     if(k==='p'||k==='P'||k==='Escape'){ if(gameState==='playing'||gameState==='paused') togglePause(); return; }
     if(k==='m'||k==='M'){ toggleMute(); if(gameState==='paused') showPauseOverlay(); return; }
     if(k==='u'||k==='U'){ if(gameState==='playing'&&state&&state.ultiCharge>=state.ultiMax) lanzarUlti(); return; }
+    // E = escudo, F = fuego rapido. Las dos solo si las compraste con gemas.
+    if(k==='e'||k==='E'){ if(gameState==='playing') usarEscudo(); return; }
+    if(k==='f'||k==='F'){ if(gameState==='playing') usarRapid(); return; }
     if(k==='r'||k==='R'){ if((gameState==='playing'||gameState==='paused')&&state) iniciar(state.modo, state.nivel); return; }
     if(k>='1'&&k<='8'){ seleccionarPorIndice(parseInt(k,10)-1); return; }
   }

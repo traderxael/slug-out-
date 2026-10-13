@@ -26,6 +26,8 @@ Abrí `index.html` en tu navegador (doble click) o jugá online con GitHub Pages
 | `Espacio` | Disparar |
 | `1` – `8` | Cambiar de elemento |
 | `U` | ULTI |
+| `E` | 🛡️ Escudo (frena todo el daño mientras dura) |
+| `F` | ⚡ Fuego rápido (doble de velocidad de disparo) |
 | `P` / `Esc` | Pausa |
 | `M` | Silenciar |
 | `R` | Reiniciar partida |
@@ -230,6 +232,36 @@ No se adivina: el selector lo marca en la tarjeta, explica la regla arriba, y al
 entrar al combate sale un **banner** que después queda como marca fija en el HUD
 durante todo el nivel.
 
+### 🔧 Mejoras: las gemas se vuelven progreso, no solo cofres
+
+En el menú, **Mejoras** convierte las gemas en progreso permanente. Cuatro cosas,
+todas con tope de 5 niveles y costo creciente:
+
+| | Qué da | Costo (nivel 1 → 5) |
+|---|---|---|
+| 🔫 **El arma** | +6% de daño y −4% de recarga por nivel (tope: +30% de daño, −20% de recarga) | 60 💎 → 240 💎 |
+| 🐌 **Cada babosa** | +8% de daño al tirar con ella. Solo podés mejorar las que ya tengas | 60 💎 → 240 💎 |
+| 🛡️ **Escudo** (tecla `E`) | Frena **todo** el daño mientras esté puesto | 150 💎 → 590 💎 |
+| ⚡ **Fuego rápido** (tecla `F`) | La recarga cae a la mitad: tirás al doble de velocidad | 150 💎 → 590 💎 |
+
+Las habilidades cuestan más que el arma a propósito: el arma te hace un poco
+mejor en lo que ya hacés, y una habilidad te da una herramienta que no tenías.
+
+**El escudo no es un muro de tiempo — es una reserva.** Cada golpe que frena lo
+gasta 250ms. Un escudo de nivel 5 dura 3.3s: aguanta unas 13 frenadas. Entonces
+usarlo justo en la andanada rinde mucho más que dejarlo prendido de entrada, y
+eso es una decisión de lectura, no de azar.
+
+**El fuego rápido también es un tradeoff**, como la potencia del tiro: disparás
+el doble de rápido, pero cada tiro sale menos cargado, así que la ventaja depende
+de a qué le estés tirando.
+
+**Los usos por combate son el nivel de la mejora** (nivel 3 = 3 usos). No es una
+habilidad que prendés y te olvidás: es para el momento que elijas.
+
+Sin comprar nada el combate es idéntico al de siempre — las mejoras no
+desbalancean el juego, cambian qué podés elegir hacer.
+
 ## ⚔️ Elementos
 
 | Elemento | Habilidad | ULTI |
@@ -358,6 +390,15 @@ node test-niveles.cjs
 # 32. End-to-end en Edge real: el banner del anillo al reves pintado en el canvas,
 #     la marca del HUD, y el selector avisando en los niveles 25 al 28
 "C:/Users/USUARIO/AppData/Local/Programs/Python/Python312/python.exe" test-anillo-browser.py
+
+# 33. Las mejoras: economia, topes, y que comprar de verdad cambie el combate
+#     (59 checks contra el juego real: arma, babosas, escudo y fuego rapido)
+node test-mejoras.cjs
+
+# 34. Las mejoras EN JUEGO (Edge real): entrar a la pantalla, comprar con gemas,
+#     y activar el escudo y el fuego rapido con las teclas E y F en combate
+
+"C:/Users/USUARIO/AppData/Local/Programs/Python/Python312/python.exe" test-mejoras-browser.py
 ```
 
 La suite 16 no cuenta píxeles: usa el modo de grabación del harness
@@ -366,7 +407,7 @@ La suite 16 no cuenta píxeles: usa el modo de grabación del harness
 porque el escudo cian `(127,212,255)` y el proyectil de hielo `#6fd6e6` son casi el mismo
 tono: un conteo por color habría dado un falso positivo permanente.
 
-Las suites 4-7, 12-17, 19-22, 24, 27, 29, 31 y 32 se escribieron **primero que el código**
+Las suites 4-7, 12-17, 19-22, 24, 27, 29, 31, 32, 33 y 34 se escribieron **primero que el código**
 (TDD): cada una se vio fallar por el motivo correcto antes de implementar. La 11
 mide el **delta** contra la línea base porque la cornisa y el fondo ya son marrones
 y suman píxeles aunque no haya ninguna roca: medir absolutos habría dado un falso
