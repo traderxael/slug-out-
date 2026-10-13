@@ -114,6 +114,9 @@ function buildGame(opts){
     toggleEquipo, renderEquipo, EQUIPO_MAX,
     statsNivel, LOGROS, COFRES,
     vence, ventaja, renderNiveles, avisoAnillo,
+    MEJORA_MAX, costoMejora, armaDano, armaCd, babosaDano, escudoDur, rapidDur,
+    usosEscudo, usosRapid, comprarMejora, danoAlJugador, usarEscudo, usarRapid,
+    renderMejoras,
     renderHistoria, histVistas,
     get overlayHTML(){ return overlayEl.innerHTML; }
 };`;
