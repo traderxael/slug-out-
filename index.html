@@ -93,6 +93,25 @@
   const EQUIPO_MAX = 3;
   const RING = ['fuego','hielo','planta','rayo','tierra','sombra','aire','agua'];
   function vence(a,b){ const i = RING.indexOf(a); return RING[(i+1)%8]===b || RING[(i+2)%8]===b || RING[(i+3)%8]===b; }
+  // Abajo (niveles con anilloInvertido) el anillo esta al reves: lo que vencia
+  // pierde y lo que perdia vence. No es "mas dificultad": es que la regla que
+  // veinte niveles te ensenan deja de servir, y hay que tirar y mirar.
+  // El aire sigue siendo neutro en los dos sentidos — nunca hay un elemento
+  // castigado de mas que los demas.
+  function anilloAlReves(L){ return !!(NIVELES[(L||1)-1] || {}).anilloInvertido; }
+  function ventaja(elKey, enTipo, L){
+    const gana = vence(elKey, enTipo);      // mi elemento vence al suyo
+    const pierde = vence(enTipo, elKey);    // el suyo vence al mio
+    const alReves = anilloAlReves(L);
+    if (alReves ? pierde : gana) return 2;
+    if (alReves ? gana : pierde) return (elKey === 'aire') ? 1 : 0.5;
+    return 1;
+  }
+  // El aviso: la inversion se LEE, no se adivina. En el selector y al empezar
+  // el combate. TDD: test-niveles.cjs seccion 8.
+  function avisoAnillo(L){
+    return anilloAlReves(L) ? '⟲ El anillo está al revés' : '';
+  }
   // 5 rarezas (nueva: LEGENDARIA)
   const RAREZA = [
     {n:'Común',     c:'#9aa3a8', mult:1.00, gem:5},
@@ -141,7 +160,21 @@
     {nombre:'Dos sedientos',       n:7, pool:ELKEYS,                                  cofre:'cristal'},
     {nombre:'El rey es la piedra', n:8, pool:ELKEYS,                                  cofre:'cristal'},
     {nombre:'Volver a sellar',     n:8, pool:ELKEYS,                                  cofre:'cristal'},
-    {nombre:'Lo que queda',        n:8, pool:ELKEYS,                                  cofre:'mitico'}
+    {nombre:'Lo que queda',        n:8, pool:ELKEYS,                                  cofre:'mitico'},
+    // ---- mas abajo: la fuente ----
+    // El 20 era dejar la cueva abierta y bajar. Este tercer acto es el descenso
+    // hasta de donde salen los elementos, y lo que se encuentra ahi: que el
+    // anillo —la regla que 20 niveles te ensenan— nunca fue una ley.
+    {nombre:'La garganta',         n:8, pool:ELKEYS,                                  cofre:'mitico'},
+    {nombre:'Lo que suena',        n:8, pool:ELKEYS,                                  cofre:'mitico'},
+    {nombre:'Ocho manos',          n:8, pool:ELKEYS,                                  cofre:'mitico'},
+    {nombre:'El que selló primero',n:8, pool:ELKEYS,                                  cofre:'mitico'},
+    // A partir de aca el anillo esta al reves: lo que vencia pierde. Se AVISA
+    // (selector + banner al empezar), porque es la decision nueva del acto.
+    {nombre:'Reglas del fondo',    n:8, pool:ELKEYS,                                  cofre:'mitico', anilloInvertido:true},
+    {nombre:'Al revés de todo',    n:8, pool:ELKEYS,                                  cofre:'mitico', anilloInvertido:true},
+    {nombre:'El elemento sin nombre',n:8,pool:ELKEYS,                                 cofre:'mitico', anilloInvertido:true},
+    {nombre:'El manantial',        n:8, pool:ELKEYS,                                  cofre:'mitico', anilloInvertido:true}
   ];
   const FREQS = {fuego:330, agua:392, tierra:262, aire:494, hielo:440, rayo:587, planta:349, sombra:233};
 
@@ -194,7 +227,26 @@
     19:{titulo:'El sello, otra vez',
         texto:'Puedo volver a sellar. Ocho elementos quietos, una cueva en paz, y nadie peleando nunca más. Es justo lo que el rey quería, y ahora entiendo por qué.'},
     20:{titulo:'Lo que queda',
-        texto:'No sellé nada. Dejé los ocho en manos de dos que todavía no saben usarlos, y bajé. La cueva va a doler un rato largo. También va a volver a cantar, y eso no lo había oído nadie en años.'}
+        texto:'No sellé nada. Dejé los ocho en manos de dos que todavía no saben usarlos, y bajé. La cueva va a doler un rato largo. También va a volver a cantar, y eso no lo había oído nadie en años.'},
+    // ---- mas abajo: la fuente ----
+    // El 20 era bajar. Estos ocho son el descenso, y el hallazgo: el anillo no
+    // era una ley de la cueva, era una costumbre, y aca abajo nadie la tiene.
+    21:{titulo:'La garganta',
+        texto:'Bajar no es caer: es decidir, otra vez, que lo de arriba ya está. La garganta es angosta y pulida, como si algo la hubiera usado muchas veces. Yo fui el último.'},
+    22:{titulo:'Lo que suena',
+        texto:'Las fuentes secas no cantan, pero acá abajo suena. No es agua: es lo que el agua era antes de secarse, y todavía espera. Me dio miedo, y seguí.'},
+    23:{titulo:'Ocho manos',
+        texto:'La fuente tiene brazos. Ocho, del color de los ocho, y todos se mueven a la vez. No pelean entre ellos: pelean conmigo, porque yo fui el que los repartió.'},
+    24:{titulo:'El que selló primero',
+        texto:'El rey no fue el primero. Antes de él hubo otro que selló una sola cosa, y le fue tan bien que selló las demás. Su nombre se perdió; su costumbre, no.'},
+    25:{titulo:'Reglas del fondo',
+        texto:'Acá el anillo no funciona. Lo que vencía, pierde, y lo que perdía, vence. Entendí tarde que el anillo nunca fue una ley: era una costumbre de la cueva, y acá nadie la tiene.'},
+    26:{titulo:'Al revés de todo',
+        texto:'Veinte niveles de saber me sirven de poco acá. Hay que tirar, mirar qué pasa, y volver a tirar. Es más lento, y es más honesto.'},
+    27:{titulo:'El elemento sin nombre',
+        texto:'Entre los ocho hay un hueco, y en el hueco hay algo sin color. No lo puedo cargar. Me mira como se mira a alguien que va a morir y todavía no lo sabe: la misma mirada del que no es guardián.'},
+    28:{titulo:'El manantial',
+        texto:'No hay ocho. Hay uno, que aprendió a tener ocho caras para que alguien pudiera elegir. El rey selló una cara por miedo; yo abrí las ocho y bajé hasta la única. Ahora sé qué cargo: no un elemento, la decisión de con cuál pararme. La cueva va a cantar, y esta vez va a haber alguien que sepa escucharla.'}
   };
 
   const SELECTOR_Y = 490, SELECTOR_H = 70;
@@ -317,7 +369,8 @@
     // que ya lo ganaron. Lo que cambia es el nombre, porque con 20 niveles el 12
     // ya no es el final: es donde se entera de la verdad.
     {id:'nivel_12',         nombre:'¡La verdad!',       desc:'Llegá al nivel 12',        gemas:150, check:s=>s.nivel>=12},
-    {id:'nivel_20',         nombre:'¡Completaste la cueva!',desc:'Llegá al nivel 20',     gemas:400, check:s=>s.nivel>=20},
+    {id:'nivel_20',         nombre:'¡Dejaste la cueva abierta!',desc:'Llegá al nivel 20', gemas:400, check:s=>s.nivel>=20},
+    {id:'nivel_28',         nombre:'¡Llegaste al manantial!',   desc:'Llegá al nivel 28', gemas:600, check:s=>s.nivel>=28},
     {id:'racha_3',         nombre:'3 días seguidos',   desc:'Jugá 3 días seguidos',          gemas:50,  check:s=>s.racha.dias>=3},
     {id:'racha_7',         nombre:'7 días seguidos',   desc:'Jugá 7 días seguidos',          gemas:150, check:s=>s.racha.dias>=7},
     {id:'combo_30',        nombre:'Combo x30',         desc:'Hacé un combo de 30',           gemas:90,  check:s=>s.stats.combos>=30},
@@ -933,9 +986,9 @@
 
   function applyHit(elKey, isCrit, r, power){
     const en = state.enemy;
-    let mult = 1;
-    if(vence(elKey,en.tipo)) mult = 2;
-    else if(vence(en.tipo,elKey)) mult = (elKey==='aire') ? 1 : 0.5;
+    // El multiplicador sale de ventaja(): es el anillo, y en los niveles de
+    // abajo el anillo esta al reves. state.nivel es el nivel que se esta jugando.
+    const mult = ventaja(elKey, en.tipo, state.nivel || 1);
     state.combo = (state.combo||0)+1;
     state.maxCombo = Math.max(state.maxCombo, state.combo);
     state.comboT = 5000;                       // el combo caduca: hay que mantener presión
@@ -2038,6 +2091,22 @@
       ctx.fillStyle = UI.dim; ctx.font = '10px sans-serif';
       const hud = state.modo==='nivel' ? 'Nivel '+state.nivel+' · '+Math.min(state.idx+1,state.n)+'/'+state.n : 'Ola '+state.wave;
       ctx.fillText(hud+' · '+state.score+' pts', W/2, 20);
+      // El aviso del anillo al reves: banner los primeros segundos y marca fija
+      // en el HUD durante todo el nivel. Antes de tirar hay que saberlo.
+      if(state.avisoHasta){
+        const ahora = (typeof performance!=='undefined') ? performance.now() : 0;
+        if(ahora < state.avisoHasta){
+          const a = Math.min(1, (state.avisoHasta-ahora)/900);
+          ctx.globalAlpha = a;
+          ctx.fillStyle = '#ff9ad5'; ctx.font = '600 13px sans-serif';
+          ctx.fillText('⟲ EL ANILLO ESTÁ AL REVÉS', W/2, 150);
+          ctx.fillStyle = UI.dim; ctx.font = '9px sans-serif';
+          ctx.fillText('lo que vencía pierde · lo que perdía vence', W/2, 166);
+          ctx.globalAlpha = 1;
+        }
+        ctx.fillStyle = '#ff9ad5'; ctx.font = '9px sans-serif';
+        ctx.fillText('⟲ anillo al revés', W/2, 46);
+      }
       if(state.combo>1){
         ctx.fillStyle = UI.accent; ctx.font = '500 10px sans-serif';
         ctx.fillText('Combo x'+state.combo, W/2, 34);
@@ -2208,6 +2277,9 @@
     running = true; lastT = 0;
     kbdPower = 1; kbdAimAngle = -Math.PI/2; kbdAimUsado = false;
     for(const k in keys) keys[k] = false;
+    // El anillo al reves se anuncia al entrar, y el aviso queda en el HUD todo
+    // el nivel: se lee, no se descubre perdiendo tiros.
+    state.avisoHasta = anilloAlReves(L) ? (typeof performance!=='undefined' ? performance.now() : 0) + 2600 : 0;
     animId = requestAnimationFrame(loop);
   }
   function salir(){ if(state && state.modo==='nivel') renderNiveles(); else renderMenu(); }
@@ -2380,9 +2452,16 @@
     let btns = '';
     NIVELES.forEach((nv,i)=>{
       const L = i+1, bloq = L>save.nivel, est = save.estrellas[L]||0;
-      btns += '<button class="lv" id="lv_'+L+'"'+(bloq?' disabled':'')+'><b>'+L+'</b> · '+nv.nombre+'<br><span class="st">'+(bloq?'Bloqueado':'★'.repeat(est)+'☆'.repeat(3-est))+'</span></button>';
+      // Los niveles con el anillo al reves lo dicen en la tarjeta: la decision
+      // nueva del tercer acto se lee antes de entrar, no se descubre perdiendo.
+      const aviso = nv.anilloInvertido
+        ? '<br><span style="color:#ff9ad5;font-size:11px;">⟲ anillo al revés</span>' : '';
+      btns += '<button class="lv" id="lv_'+L+'"'+(bloq?' disabled':'')+'><b>'+L+'</b> · '+nv.nombre
+        +'<br><span class="st">'+(bloq?'Bloqueado':'★'.repeat(est)+'☆'.repeat(3-est))+'</span>'+aviso+'</button>';
     });
-    showOverlay('<h2>Niveles</h2><div class="grid">'+btns+'</div><button class="btn btnAlt" id="btnVolver">Volver</button>');
+    showOverlay('<h2>Niveles</h2>'
+      +'<p style="font-size:12px;color:#ff9ad5;">Del 25 al 28 el anillo está al revés: lo que vencía pierde, y lo que perdía vence.</p>'
+      +'<div class="grid">'+btns+'</div><button class="btn btnAlt" id="btnVolver">Volver</button>');
     NIVELES.forEach((nv,i)=>{ if(i+1<=save.nivel) bind('lv_'+(i+1), ()=>iniciar('nivel', i+1)); });
     bind('btnVolver', renderMenu);
   }
@@ -2576,13 +2655,14 @@
     const habil = ELKEYS.map(el=>'<span style="color:'+ELEMENT_INFO[el].color+';"><b>'+ELEMENT_INFO[el].nombre+'</b></span>: '+ELEMENT_INFO[el].habilidad+'<br><span style="color:#ff5f6d;font-size:10px;">ULTI: '+ELEMENT_INFO[el].ulti+'</span>').join('<br>');
     showOverlay(
       '<h2>Cómo jugar</h2>'
+      +'<p style="text-align:left;font-size:12px;color:#ff9ad5;"><b>⟲ El anillo al revés (niveles 25 al 28)</b><br>Más abajo el anillo de elementos se invierte: lo que vencía <b>pierde</b>, y lo que perdía <b>vence</b>. No es más difícil: es que la regla que aprendiste deja de servir y hay que tirar y mirar. Se avisa en el selector y con un banner al empezar el combate.</p>'
       +'<p>Arrastra para apuntar y <b>soltá</b> para disparar. Podés interceptar los escupitajos del rival. La barra de arriba del selector carga tu <b>habilidad definitiva</b> con cada acierto.</p>'
       +'<p style="text-align:left;font-size:12px;color:#ffc371;"><b>⚡ Potencia de tiro</b><br>Cuanto más lejos arrastres, más potente es el disparo: más daño y el efecto elemental <b>garantizado</b> a carga máxima (marca MÁX). Pero la recarga se alarga. Espamear tiros flojos o comprometerse a uno pesado es la decisión central.</p>'
       +'<p style="text-align:left;font-size:12px;color:#ff8a6a;"><b>🎯 Esquiva telegrafiada</b><br>El rival <b>avisa</b> antes de esquivar: se agacha y aparece un anillo naranja que se cierra. Durante esa ventana está quieto — si le acertás, la esquiva se <b>CANCELA</b> (¡INTERRUMPIDO!) y queda aturdido. <b>No esquiva al azar:</b> lo que crece con el nivel es a qué distancia ve venir el tiro, así que el anillo aparece más temprano y cuesta más cortarlo. Un tiro <b>pesado</b> llega antes de que complete la esquiva; uno flojo llega tarde y ya se movió. Más carga = más fiable contra la evasión.</p>'
       +'<p style="text-align:left;font-size:12px;color:#c9a86a;"><b>🪨 Rocas que caen</b><br>El techo suelta rocas. Antes de caer se marcan con un triángulo que tiembla sobre la columna: <b>leé por dónde va a caer</b> y elegí. Una roca en el camino <b>consume tu tiro</b> (se rompe a los pocos golpes), y si cae por tu columna <b>te golpea</b>. Cambiá de columna, apurá el tiro, o rompela antes de que caiga.</p>'
       +'<p style="text-align:left;font-size:12px;color:#7fd4ff;"><b>🛡️ Enemigos con comportamiento</b><br>No todos son iguales, y cada uno te obliga a responder distinto:<br>· <b>Escudado</b> (nivel 4+): levanta un escudo que <b>absorbe tu tiro</b>. El anillo cian se cierra antes de subir: esperá a que baje, cambiá de elemento, o gastá el tiro a propósito.<br>· <b>Saltarín</b> (nivel 7+): se agacha y <b>salta</b>. Leé la altura antes de tirar.<br>· <b>Frenético</b> (todos los jefes): al bajar de la mitad de la vida <b>se enfurece</b> — aura roja, se mueve más rápido y ataca más seguido. Bajalo de golpe o bancate la andanada.</p>'
       +'<p style="text-align:left;font-size:12px;color:#b9a6e8;"><b>🎨 La habilidad de su elemento</b><br>Cada villano usa contra vos <b>la habilidad de SU elemento</b>, igual que tus babosas. El anillo de carga se pinta del color del elemento, así que <b>leés cuál viene</b> antes de que salga:<br>· <b>🔥 Fuego</b>: charco ardiente bajo tus pies que te quema<br>· <b>💧 Agua</b>: marea que te alarga la recarga<br>· <b>🪨 Tierra</b>: te aturde — no disparás, pero conservás la carga<br>· <b>🌪️ Aire</b>: abanico de 3 tiros perforantes<br>· <b>❄️ Hielo</b>: te congela — no disparás <b>y te baja la carga</b><br>· <b>⚡ Rayo</b>: descarga doble, el primero avisa el segundo<br>· <b>🌿 Planta</b>: se regenera y te enreda<br>· <b>🌑 Sombra</b>: te roba vida y se cura con ella</p>'
-      +'<p style="text-align:left;font-size:12px;color:#b9a6e8;"><b>📖 La historia de la campana</b><br>Tras cada combate ganado, un pedazo de historia cuenta qué pasa en la cueva y por qué la estás recorriendo. El arco se lee con los elementos: el fuego que seca, el hielo que conserva, la sombra que drena. Son <b>20 fragmentos</b>: los 12 primeros son el viaje hasta la verdad, y del 13 al 20 las consecuencias de haber abierto la cueva. Si no te interesa, <b>Saltar</b> y listo. Cuando quieras, en el menú está <b>Ruta de la cueva</b> para volver a leerlos en orden.</p>'
+      +'<p style="text-align:left;font-size:12px;color:#b9a6e8;"><b>📖 La historia de la campana</b><br>Tras cada combate ganado, un pedazo de historia cuenta qué pasa en la cueva y por qué la estás recorriendo. El arco se lee con los elementos: el fuego que seca, el hielo que conserva, la sombra que drena. Son <b>28 fragmentos</b>: los 12 primeros son el viaje hasta la verdad, del 13 al 20 las consecuencias de haber abierto la cueva, y del 21 al 28 el descenso hasta la fuente — donde se descubre que el anillo nunca fue una ley. Si no te interesa, <b>Saltar</b> y listo. Cuando quieras, en el menú está <b>Ruta de la cueva</b> para volver a leerlos en orden.</p>'
       +'<p style="text-align:left;font-size:12px;color:#8fd68a;"><b>🐌 Tu equipo de combate</b><br>Tenés una mochila con babosas, pero al combate entran <b>solo 3</b>. En el menú, <b>Equipo</b> abre el selector: tocá una babosa de la mochila para meterla, y tocá una del equipo para sacarla. Las marcadas llevan el borde de su color. Cuando el equipo está lleno las demás se apagan: hay que sacar una antes de meter otra. El equipo queda guardado, así que elegís una vez y peleás siempre con esas 3. En combate cambiás entre ellas con el selector de abajo o las teclas <b>1, 2 y 3</b>.</p>'
       +'<p style="text-align:left;font-size:12px;color:#6ad4ff;"><b>Teclado (PC)</b><br>← → apuntar · ↑ ↓ potencia · Espacio disparar · 1-3 elemento · U ULTI · P pausa · M sonido · R reiniciar</p>'
       +'<p style="text-align:left;font-size:11px;">'+ventajas+'</p>'
