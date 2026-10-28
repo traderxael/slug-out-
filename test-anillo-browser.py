@@ -1,3 +1,4 @@
+from pathlib import Path
 """Verificacion end-to-end del anillo al reves (Edge headless real).
 
 Las suites node prueban que ventaja() invierta el multiplicador y que el
@@ -7,7 +8,7 @@ fondo, el banner se pinte de verdad y el dano salga invertido.
 import asyncio
 from playwright.async_api import async_playwright
 
-URL  = "file:///C:/Users/USUARIO/slug-out-/index.html"
+URL = Path(__file__).resolve().with_name("index.html").as_uri()
 EDGE = r"C:\Program Files (x86)\Microsoft\Edge\Application\msedge.exe"
 SAVE = "lanzador_cavernas_2_save_v1"
 

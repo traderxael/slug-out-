@@ -1,6 +1,7 @@
 // Extrae las funciones de potencia DEL ARCHIVO REAL y valida el tradeoff.
 const fs = require('fs');
-const SRC = 'C:/Users/USUARIO/slug-out-/index.html';
+const path = require('path');
+const SRC = path.join(__dirname, 'index.html');
 const html = fs.readFileSync(SRC, 'utf8');
 
 // --- extraer el bloque de potencia tal como está en el archivo ---

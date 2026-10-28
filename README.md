@@ -360,17 +360,17 @@ node test-obstaculos-spawn.cjs        # aparecen solas y telegrafiadas antes de 
 node test-obstaculos-amenaza.cjs      # la roca golpea al jugador solo en su columna
 
 # 8. Juego real en Edge headless: mide la fisica por pixels y ejercita los controles
-"C:/Users/USUARIO/AppData/Local/Programs/Python/Python312/python.exe" qa-juego.py
+python qa-juego.py
 
 # 9. La esquiva telegrafiada EN JUEGO: control sin evasion, el tell visible como anillo
-"C:/Users/USUARIO/AppData/Local/Programs/Python/Python312/python.exe" test-esquiva.py
+python test-esquiva.py
 
 # 10. La esquiva EN JUEGO: el tell se dibuja y la esquiva COMPLETA de verdad
 #     (instrumenta ctx.ellipse y ctx.fillText en Edge; caza "¡Esquivó!")
-"C:/Users/USUARIO/AppData/Local/Programs/Python/Python312/python.exe" test-esquiva-browser.py
+python test-esquiva-browser.py
 
 # 11. Las rocas EN JUEGO: que el tell y la roca se VEAN (delta contra la linea base)
-"C:/Users/USUARIO/AppData/Local/Programs/Python/Python312/python.exe" test-obstaculos-visual.py
+python test-obstaculos-visual.py
 
 # 12-17. Arquetipos: absorcion del escudo, su ciclo telegrafiado, el salto, la
 #         furia, la asignacion por nivel y LO QUE SE DIBUJA de cada uno
@@ -382,7 +382,7 @@ node test-arquetipos-asignacion.cjs
 node test-arquetipos-visual.cjs
 
 # 18. End-to-end en Edge real: el juego corre sin errores y la furia se ve jugando
-"C:/Users/USUARIO/AppData/Local/Programs/Python/Python312/python.exe" test-arquetipos-browser.py
+python test-arquetipos-browser.py
 
 # 19-22. Habilidades elementales del villano: que las 8 se activen solas y
 #         avisadas, que SE SIENTAN sobre el jugador, y que se vean
@@ -391,17 +391,17 @@ node test-habilidades-efectos.cjs
 node test-habilidades-visual.cjs
 
 # 23. End-to-end en Edge real: salen solas jugando y se ven por su color
-"C:/Users/USUARIO/AppData/Local/Programs/Python/Python312/python.exe" test-habilidades-browser.py
+python test-habilidades-browser.py
 
 # 24. Mini historia: datos del arco y el flujo completo con clics simulados
 #     (victoria -> historia -> siguiente nivel, y repetir NO muestra historia)
 node test-historia.cjs
 
 # 25. End-to-end en Edge real: GANAR de verdad el nivel 1 y leer la historia
-"C:/Users/USUARIO/AppData/Local/Programs/Python/Python312/python.exe" test-historia-browser.py
+python test-historia-browser.py
 
 # 26. El juego YA PUBLICADO, cargado desde la URL de produccion
-"C:/Users/USUARIO/AppData/Local/Programs/Python/Python312/python.exe" qa-live.py
+python qa-live.py
 
 # 27. El equipo de combate: con las 8 en la mochila entran 3, y son las que
 #     elegis. Cubre el guardado, el saneado al cargar y las reglas de marcar
@@ -410,7 +410,7 @@ node test-equipo.cjs
 # 28. End-to-end en Edge real: abrir el selector, marcar y desmarcar con el
 #     mouse, y que el combate arranque con esas 3 (instrumenta ctx.fillText
 #     para leer los nombres que pinta el selector de abajo)
-"C:/Users/USUARIO/AppData/Local/Programs/Python/Python312/python.exe" test-equipo-browser.py
+python test-equipo-browser.py
 
 # 29. La campana de 28 niveles y su ruta de historia: un fragmento por nivel,
 #     el arco que cierra en el ultimo, el balance sano hasta el 20, y el logro
@@ -419,7 +419,7 @@ node test-niveles.cjs
 
 # 30. End-to-end en Edge real: abrir la ruta, ver solo lo ya vivido, releer un
 #     fragmento tocandolo, y el selector de niveles llegando a 20
-"C:/Users/USUARIO/AppData/Local/Programs/Python/Python312/python.exe" test-ruta-browser.py
+python test-ruta-browser.py
 
 # 31. El anillo al reves del tercer acto: que ventaja() invierta de verdad el
 #     multiplicador, que el aire nunca quede castigado, y que la inversion no
@@ -428,7 +428,7 @@ node test-niveles.cjs
 
 # 32. End-to-end en Edge real: el banner del anillo al reves pintado en el canvas,
 #     la marca del HUD, y el selector avisando en los niveles 25 al 28
-"C:/Users/USUARIO/AppData/Local/Programs/Python/Python312/python.exe" test-anillo-browser.py
+python test-anillo-browser.py
 
 # 33. Las mejoras: economia, topes, y que comprar de verdad cambie el combate
 #     (59 checks contra el juego real: arma, babosas, escudo y fuego rapido)
@@ -437,7 +437,7 @@ node test-mejoras.cjs
 # 34. Las mejoras EN JUEGO (Edge real): entrar a la pantalla, comprar con gemas,
 #     y activar el escudo y el fuego rapido con las teclas E y F en combate
 
-"C:/Users/USUARIO/AppData/Local/Programs/Python/Python312/python.exe" test-mejoras-browser.py
+python test-mejoras-browser.py
 
 # 35. El modo infinito como modo propio: ciclos del anillo, arquetipos
 #     presentados de a uno, la historia que da vueltas y el lazo con las mejoras
@@ -446,7 +446,7 @@ node test-infinito.cjs
 # 36. El modo infinito EN JUEGO (Edge real): el boton del menu, volver a leer los
 #     fragmentos con ??? en lo no jugado, y el combate arrancando en la ola 1
 
-"C:/Users/USUARIO/AppData/Local/Programs/Python/Python312/python.exe" test-infinito-browser.py
+python test-infinito-browser.py
 ```
 
 La suite 16 no cuenta píxeles: usa el modo de grabación del harness

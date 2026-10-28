@@ -1,3 +1,4 @@
+from pathlib import Path
 """Verificacion end-to-end del selector de babosas (Edge headless real).
 
 Las suites node prueban la mecanica (equipoActual, toggleEquipo, normalizeSave).
@@ -13,7 +14,7 @@ del equipo se pintan con su nombre en y=548.
 import asyncio
 from playwright.async_api import async_playwright
 
-URL  = "file:///C:/Users/USUARIO/slug-out-/index.html"
+URL = Path(__file__).resolve().with_name("index.html").as_uri()
 EDGE = r"C:\\Program Files (x86)\\Microsoft\\Edge\\Application\\msedge.exe"
 SAVE = "lanzador_cavernas_2_save_v1"
 

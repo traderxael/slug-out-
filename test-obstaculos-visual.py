@@ -1,3 +1,4 @@
+from pathlib import Path
 """
 Verificacion visual de las rocas en el juego REAL (Edge headless).
 
@@ -9,7 +10,7 @@ ser invisible.
 import asyncio
 from playwright.async_api import async_playwright
 
-URL  = "file:///C:/Users/USUARIO/slug-out-/index.html"
+URL = Path(__file__).resolve().with_name("index.html").as_uri()
 EDGE = r"C:\Program Files (x86)\Microsoft\Edge\Application\msedge.exe"
 SAVE = "lanzador_cavernas_2_save_v1"
 W, H = 360, 560

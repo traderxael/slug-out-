@@ -1,3 +1,4 @@
+from pathlib import Path
 # QA real del juego en Edge headless. Cada check tiene un numero detras.
 # Tres mediciones distintas, cada una con su banda para no contaminarse:
 #   ANIM    - todo el canvas          -> "esta vivo?" / "esta en pausa?"
@@ -6,10 +7,11 @@
 import sys, time
 from playwright.sync_api import sync_playwright
 
-URL  = "file:///C:/Users/USUARIO/slug-out-/index.html"
+URL = Path(__file__).resolve().with_name("index.html").as_uri()
 SAVE = "lanzador_cavernas_2_save_v1"
 EDGE = r"C:\Program Files (x86)\Microsoft\Edge\Application\msedge.exe"
-SHOT = "C:/Users/USUARIO/AppData/Local/hermes/cache/scratch"
+SHOT = str(Path(__file__).resolve().parent / "screenshots")
+Path(SHOT).mkdir(exist_ok=True)
 
 def mk(y0, y1, x0, x1):
     return f"""() => {{
