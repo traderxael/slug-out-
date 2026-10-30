@@ -513,6 +513,25 @@
         texto:'No hay ocho. Hay uno, que aprendió a tener ocho caras para que alguien pudiera elegir. El rey selló una cara por miedo; yo abrí las ocho y bajé hasta la única. Ahora sé qué cargo: no un elemento, la decisión de con cuál pararme. La cueva va a cantar, y esta vez va a haber alguien que sepa escucharla.'}
   };
 
+  // ---------- el epilogo ----------
+  // El arco de la campana cierra en el 12 ("La verdad"), pero el juego sigue:
+  // del 13 al 28 van las consecuencias y el descenso. Lo que faltaba era el
+  // CIERRE: un fragmento que dice que paso DESPUES de la verdad, para que la
+  // campana se cierre de verdad y los niveles que sigan no sean un "siguiente"
+  // mas.
+  //
+  // Vive en su propia pantalla y NO en HISTORIA: HISTORIA es 1 a 1 con los
+  // niveles (un fragmento por combate) y el epilogo no es un nivel, es el
+  // puente entre dos actos (issue #3).
+  const NIVEL_EPILOGO = 12;
+  const EPILOGO = {
+    titulo: 'Después de la verdad',
+    texto: 'Abrí los ocho en el corazón de la cueva, donde el rey los había cerrado, y la cueva volvió a tener todo lo que le faltaba. Salí con el agua goteando detrás y los elementos atados al pecho. La verdad no fue un final: fue el punto donde dejé de bajar y empecé a vivir en lo que había abierto. Esto era el viaje. Lo que viene es la consecuencia.'
+  };
+  // El epilogo ya se vivio cuando se gano el nivel 12: la verdad ya esta en el
+  // save, asi que no hace falta guardar nada mas.
+  function epilogoVisto(){ return (save.estrellas[NIVEL_EPILOGO] || 0) > 0; }
+
   const SELECTOR_Y = 490, SELECTOR_H = 70;
   const LX = W/2, LY = SELECTOR_Y - 46;
   const LEDGE_Y = 128, FLOOR_Y = LY + 26;
@@ -1027,6 +1046,26 @@
     bind('btnSaltarHist', ()=>{ hideOverlay(); continuar(); });
     bind('btnSeguirHist',  ()=>{ hideOverlay(); continuar(); });
   }
+  // El epilogo: una pantalla propia, con su propio color, entre el fragmento
+  // del 12 y el nivel 13. Se puede saltar, como cualquier fragmento: la
+  // campana sigue igual.
+  function mostrarEpilogo(continuar){
+    if(typeof continuar !== 'function') return;
+    const col = '#b9a6e8';
+    showOverlay(
+        '<div class="hist">'
+      +   '<div class="histTag" style="color:'+col+'">Epílogo</div>'
+      +   '<div class="histLinea" style="background:'+col+'"></div>'
+      +   '<h2 class="histTit" style="color:'+col+'">'+EPILOGO.titulo+'</h2>'
+      +   '<p class="histP">'+EPILOGO.texto+'</p>'
+      +   '<div class="fila" style="margin-top:8px">'
+      +     '<button class="btn btnAlt btnS" id="btnSaltarEpilogo">Saltar</button>'
+      +     '<button class="btn" id="btnSeguirEpilogo">Continuar</button>'
+      +   '</div>'
+      + '</div>');
+    bind('btnSaltarEpilogo', ()=>{ hideOverlay(); continuar(); });
+    bind('btnSeguirEpilogo',  ()=>{ hideOverlay(); continuar(); });
+  }
   // ---------- la ruta de historia ----------
   // Los fragmentos se leen de a uno entre combates. Aca se pueden volver a leer
   // en orden, que es la unica forma de que el arco se entienda como viaje y no
@@ -1054,13 +1093,24 @@
         + '<div style="color:'+(vivo?'var(--ink)':'#666')+';font-size:13px;font-weight:600;margin-top:2px;">'+(vivo?h.titulo:'???')+'</div>'
         + '</div>';
     });
+    // El epilogo no es un nivel, asi que va aparte de la lista: aparece en la
+    // ruta cuando ya viviste la verdad (el 12) y se puede volver a leer.
+    if(epilogoVisto()){
+      items += '<div class="histItem" data-hist="epilogo" style="cursor:pointer">'
+        + '<div style="color:#b9a6e8;font-size:10px;letter-spacing:1.5px;">EPÍLOGO</div>'
+        + '<div style="color:var(--ink);font-size:13px;font-weight:600;margin-top:2px;">'+EPILOGO.titulo+'</div>'
+        + '</div>';
+      vistas++;
+    }
     showOverlay('<h2>La ruta de la cueva</h2>'
-      +'<p style="font-size:12px;color:var(--dim)">La historia, fragmento por fragmento · '+vistas+' de '+Object.keys(HISTORIA).length+' vividos · tocá uno para volver a leerlo</p>'
+      +'<p style="font-size:12px;color:var(--dim)">La historia, fragmento por fragmento · '+vistas+' de '+(Object.keys(HISTORIA).length + (epilogoVisto()?1:0))+' vividos · tocá uno para volver a leerlo</p>'
       +'<div id="histLista" style="display:flex;flex-direction:column;gap:6px;width:100%;max-width:320px;text-align:left;">'+items+'</div>'
       +'<button class="btn btnAlt" id="btnVolver">Volver</button>');
     document.querySelectorAll('[data-hist]').forEach(node=>{
       node.addEventListener('click', ()=>{
-        const L = Number(node.getAttribute('data-hist'));
+        const ref = node.getAttribute('data-hist');
+        if(ref === 'epilogo'){ mostrarEpilogo(renderHistoria); return; }
+        const L = Number(ref);
         if(save.estrellas[L] > 0) mostrarHistoria(L, renderHistoria);
       });
     });
@@ -2698,7 +2748,10 @@
       // Avanzar SI pasa por la mini historia: es el puente entre combates.
       // Repetir y volver a Niveles van directo, porque no estas avanzando el viaje.
       bind('btnSiguiente', ()=>mostrarHistoria(L, ()=>{
-        if(L < NIVELES.length) iniciar('nivel', L+1);
+        // El epilogo va entre el 12 y el 13: la campana cierra en la verdad, y
+        // lo que sigue son las consecuencias (issue #3).
+        if(L === NIVEL_EPILOGO) mostrarEpilogo(()=>iniciar('nivel', L+1));
+        else if(L < NIVELES.length) iniciar('nivel', L+1);
         else renderNiveles();
       }));
       bind('btnRepetir', ()=>iniciar('nivel', L));

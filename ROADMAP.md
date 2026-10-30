@@ -222,10 +222,20 @@ exactamente los 3 nombres elegidos). Ambos se escribieron antes que el código.
   nivel se avisa a sí mismo al entrar: `TUTORIAL_AVISO` = "NIVEL 1 · sin rocas:
   probá el tiro". **Tests:** `test-tutorial-nivel-1.cjs` (el nivel 1 sin
   arquetipos, sin esquiva y sin ninguna roca en 14.4s; el nivel 2 sigue con las
-  tres cosas) y `test-arquetipos-asignacion.cjs`, que ahora exige que el jefe
-  frenético empiece en el 2 y no en el 1.
-- **Un epílogo tras el nivel 12.** El arco cierra con "La verdad", pero el juego
-  sigue. Un último fragmento que diga qué pasó después daría cierre real.
+  tres cosas), `test-tutorial-nivel-1-browser.py` (Edge real: 0 píxeles de roca
+  en el nivel 1 y las rocas vuelven en el 2) y
+  `test-arquetipos-asignacion.cjs`, que ahora exige que el jefe frenético
+  empiece en el 2 y no en el 1.
+- ~~**Un epílogo tras el nivel 12.**~~ ✅ HECHO — el epílogo tiene su propia
+  pantalla (`mostrarEpilogo`) y aparece entre el fragmento del 12 ("La verdad")
+  y el nivel 13: el arco cierra y lo que viene son las consecuencias. **No va en
+  `HISTORIA`**: esa lista es 1 a 1 con los niveles (un fragmento por combate) y
+  el epílogo no es un nivel, es el puente entre dos actos. También queda en la
+  "Ruta de la cueva", y se puede volver a leer desde ahí una vez viviste la
+  verdad. **Tests:** `test-epilogo.cjs` (el epílogo va después del fragmento del
+  12 y antes del 13, los demás niveles no lo muestran, y la ruta solo lo
+  muestra si ya ganaste el 12) y `test-epilogo-browser.py` (Edge real: el
+  epílogo se ve y se relee desde la ruta).
 - ~~**El modo infinito tiene menos pulido que la campana.**~~ ✅ HECHO — ahora es
   un modo propio: arquetipos presentados de a uno con aviso, 8 fragmentos de
   historia que dan vueltas, el anillo invertido por ciclos del 25 en adelante, y
