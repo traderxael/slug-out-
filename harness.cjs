@@ -115,6 +115,7 @@ function buildGame(opts){
     'avisoArquetipoInfinito','OLAS_HISTORIA','historiaInfinito','fragmentoInfinito',
     'mostrarHistoriaInfinito','gemasPorOla','resumenMejoras','histInfVistas',
     'renderHistoriaInfinito','renderHistoria','histVistas','avisoInfinito',
+    'EPILOGO','mostrarEpilogo','epilogoVisto','NIVEL_EPILOGO',
     'esOlaHistoria','siguienteMejora','HISTORIA_INF',
     'MEJORA_MAX','costoMejora','armaDano','armaCd','babosaDano','escudoDur','rapidDur',
     'usosEscudo','usosRapid','comprarMejora','danoAlJugador','usarEscudo','usarRapid',
