@@ -388,6 +388,19 @@
     cristal:{nombre:'Cofre de cristal',probs:[0,0,25,55,20],   body:'#3f7fbf', band:'#1c3a5c', metal:'#bfe8ff', precio:900},
     mitico: {nombre:'Cofre mítico',    probs:[0,0,0,50,50],    body:'#5c2a7a', band:'#2a1040', metal:'#ff9ad5', precio:0}
   };
+  // ---------- el nivel 1 es el TUTORIAL de la campana ----------
+  // El primer contacto tiene que enseñar una sola cosa: el tiro y la potencia.
+  // Si encima caen rocas y ya estan las habilidades del rival, el jugador
+  // aprende a esquivar antes que a disparar. El nivel 1 no tiene ninguna de las
+  // dos, y el resto se presenta despues, de a una (issue #2).
+  const NIVEL_TUTORIAL = 1;
+  function esTutorial(L){ return L === NIVEL_TUTORIAL; }
+  // El aviso del tutorial: el juego no le enseña las reglas a nadie, asi que
+  // el primer nivel dice que es un tutorial y para que sirve.
+  const TUTORIAL_AVISO = 'NIVEL 1 · sin rocas: probá el tiro';
+  const TUTORIAL_SUB   = 'el tutorial: sin rocas ni habilidades';
+  const AVISO_SUB      = 'se lee, no se descubre perdiendo tiros';
+
   const NIVELES = [
     {nombre:'Umbral',              n:3, pool:['fuego','agua'],                        cofre:'madera'},
     {nombre:'Galería húmeda',      n:4, pool:['fuego','agua','planta'],               cofre:'madera'},
@@ -1130,6 +1143,7 @@
   // Asignacion de arquetipo: se introducen por nivel para que el jugador los
   // aprenda de a uno, no se los tiren todos juntos desde el nivel 1.
   function arquetipoDe(L, idx, boss){
+    if(esTutorial(L)) return 'normal';   // el tutorial no trae habilidades
     if(boss) return 'frenetico';
     if(L>=7 && idx%3===2) return 'saltarin';
     if(L>=4 && idx%3===1) return 'escudado';
@@ -1143,7 +1157,7 @@
       atkInterval: Math.max(1300, 3300*st.intMul-idx*40)*(boss?1.12:1),
       atkDamage: 8*st.dmgMul*(boss?1.15:1),
       rafaga: boss ? Math.min(3, st.rafaga+(L>=3?1:0)) : st.rafaga,
-      evasion: boss ? Math.min(0.5, st.evasion+0.1) : st.evasion,
+      evasion: esTutorial(L) ? 0 : (boss ? Math.min(0.5, st.evasion+0.1) : st.evasion),
       arquetipo: arquetipoDe(L, idx, boss)
     });
   }
@@ -1677,8 +1691,12 @@
     // instantes antes de soltarse. Durante ese rato el jugador decide — cambiar
     // de columna, apurar el tiro, o romper la roca antes de que caiga. Una roca
     // que cae de la nada no tendria decision, solo suerte.
-    if(state.rocaTimer > 0) state.rocaTimer -= dt;
-    else { state.rocaTimer = intervaloRoca(); spawnRoca(); }
+    // Las rocas: el nivel 1 es el tutorial y todavia no se las lee, asi que
+    // ahi no cae ninguna. En los demas niveles (y en el infinito) cae igual.
+    if(state.modo === 'infinito' || !esTutorial(state.nivel)){
+      if(state.rocaTimer > 0) state.rocaTimer -= dt;
+      else { state.rocaTimer = intervaloRoca(); spawnRoca(); }
+    } else if(state.rocas.length) state.rocas.length = 0;
     for(let k=state.rocas.length-1;k>=0;k--){
       const ro = state.rocas[k];
       if(ro.tellT > 0){ ro.tellT -= dt; continue; }   // telegrafiada: marcada y quieta
@@ -2436,7 +2454,7 @@
           ctx.fillStyle = '#ff9ad5'; ctx.font = '600 13px sans-serif';
           ctx.fillText(txt.length > 34 ? txt.slice(0, 33)+'…' : txt, W/2, 150);
           ctx.fillStyle = UI.dim; ctx.font = '9px sans-serif';
-          ctx.fillText('se lee, no se descubre perdiendo tiros', W/2, 166);
+          ctx.fillText(state.avisoSub || AVISO_SUB, W/2, 166);
           ctx.globalAlpha = 1;
         }
         // La marca fija del anillo: mientras el anillo este al reves, seguir
@@ -2632,9 +2650,11 @@
     // el nivel: se lee, no se descubre perdiendo tiros. En infinito el aviso
     // sale de la ola (presentacion de arquetipo o ciclo invertido).
     const nivelAviso = (modo==='infinito') ? 1 : L;
-    const avisoTxt = (modo==='infinito') ? avisoInfinito(1) : avisoAnillo(L);
+    const esTut = (modo==='nivel') && esTutorial(L);
+    const avisoTxt = (modo==='infinito') ? avisoInfinito(1) : (esTut ? TUTORIAL_AVISO : avisoAnillo(L));
     state.avisoHasta = avisoTxt ? (typeof performance!=='undefined' ? performance.now() : 0) + 2600 : 0;
     state.avisoTexto = avisoTxt || '';
+    state.avisoSub = esTut ? TUTORIAL_SUB : AVISO_SUB;
     animId = requestAnimationFrame(loop);
   }
   function salir(){ if(state && state.modo==='nivel') renderNiveles(); else renderMenu(); }

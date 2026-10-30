@@ -110,6 +110,7 @@ function buildGame(opts){
     'equipoActual','baseSave','normalizeSave','mejorRareza','renderMenu',
     'toggleEquipo','renderEquipo','EQUIPO_MAX',
     'statsNivel','LOGROS','COFRES',
+    'esTutorial','NIVEL_TUTORIAL','intervaloRoca',
     'vence','ventaja','renderNiveles','avisoAnillo','anilloAlReves',
     'avisoArquetipoInfinito','OLAS_HISTORIA','historiaInfinito','fragmentoInfinito',
     'mostrarHistoriaInfinito','gemasPorOla','resumenMejoras','histInfVistas',

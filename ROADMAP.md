@@ -215,9 +215,15 @@ exactamente los 3 nombres elegidos). Ambos se escribieron antes que el código.
 
 ### 3. Candidatos (ideas, no compromisos)
 
-- **El nivel 1 como tutorial.** Es el primer contacto y ya tiene rocas y
-  habilidades del rival desde el arranque. Podría ser el único nivel sin ninguna
-  de las dos, para enseñar de a una.
+- ~~**El nivel 1 como tutorial.**~~ ✅ HECHO — el nivel 1 ya no tiene rocas ni
+  habilidades del rival: ni escudado, ni saltarín, ni frenético, y el guardián
+  tampoco esquiva (`esTutorial`). Queda solo el tiro y la potencia, que es lo que
+  hay que aprender primero; el resto se presenta después, de a una. Además el
+  nivel se avisa a sí mismo al entrar: `TUTORIAL_AVISO` = "NIVEL 1 · sin rocas:
+  probá el tiro". **Tests:** `test-tutorial-nivel-1.cjs` (el nivel 1 sin
+  arquetipos, sin esquiva y sin ninguna roca en 14.4s; el nivel 2 sigue con las
+  tres cosas) y `test-arquetipos-asignacion.cjs`, que ahora exige que el jefe
+  frenético empiece en el 2 y no en el 1.
 - **Un epílogo tras el nivel 12.** El arco cierra con "La verdad", pero el juego
   sigue. Un último fragmento que diga qué pasó después daría cierre real.
 - ~~**El modo infinito tiene menos pulido que la campana.**~~ ✅ HECHO — ahora es
