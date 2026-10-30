@@ -2862,7 +2862,7 @@
       +'<button class="btn" id="btnNiveles">Niveles</button>'
     +'<button class="btnAlt" id="btnEquipo">🐌 Equipo · '+equipoActual().length+'/'+EQUIPO_MAX+'</button>'
     +'<button class="btnAlt" id="btnMejoras">🔧 Mejoras</button>'
-    +'<button class="btnAlt" id="btnHistoria">📖 Ruta de la cueva · '+histVistas()+'/'+Object.keys(HISTORIA).length+'</button>'
+    +'<button class="btnAlt" id="btnHistoria">📖 Ruta de la cueva · '+(histVistas()+(epilogoVisto()?1:0))+'/'+(Object.keys(HISTORIA).length+(epilogoVisto()?1:0))+'</button>'
       +'<button class="btn btnAlt" id="btnInfinito">Modo infinito</button>'
       +'<button class="btn btnAlt" id="btnCofres">Cofres'+(n?' ('+n+')':'')+'</button>'
       +'<button class="btn btnAlt" id="btnColeccion">Colección '+totalBabosas()+'/40</button>'
