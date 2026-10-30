@@ -46,9 +46,13 @@ check('nivel 6 todavia no trae saltarin',
       ![0,1,2,3,4].some(i => de(6, i) === 'saltarin'));
 
 // ---------- El ultimo de cada nivel (jefe) es siempre frenetico ----------
+// Salvo el nivel 1: es el tutorial y no trae habilidades del rival (issue #2).
 const jefes = [1,2,3,4,5,6,7,8].map(L => de(L, G.NIVELES[L-1].n-1));
-check('el jefe de cada nivel es frenetico (se enfurece al 50%)',
-      jefes.every(a => a === 'frenetico'), `[${jefes.join(', ')}]`);
+check('el jefe de cada nivel es frenetico (se enfurece al 50%), menos el tutorial',
+      jefes[0] === 'normal' && jefes.slice(1).every(a => a === 'frenetico'),
+      `[${jefes.join(', ')}]`);
+check('el jefe del nivel 1 es normal: el tutorial no trae habilidades',
+      jefes[0] === 'normal', `nivel 1 = ${jefes[0]}`);
 
 // ---------- Modo infinito: mismo criterio por oleada ----------
 // Cada 5a oleada es jefe, y el jefe manda: la oleada 10 es frenetico, no saltarin.
