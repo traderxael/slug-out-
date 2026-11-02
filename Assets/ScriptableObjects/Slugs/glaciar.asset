@@ -1,0 +1,34 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 169a931c15d0e284188fe761457fcd79, type: 3}
+  m_Name: glaciar
+  m_EditorClassIdentifier: Assembly-CSharp::SlugOut.Slugs.SlugData
+  slugId: glaciar
+  slugName: Glaciar
+  description: 'Glaciar (Rara, Ice): Puede congelar al rival y bajar su carga. Escala 1,45x sobre la base del elemento.'
+  element: 5
+  habitat: Estalactitas y charcos congelados.
+  conducta: Duerme sobre el hielo; el calor la despierta de mal humor.
+  uso: Congela y baja la carga del blaster rival.
+  limitacion: El fuego la derrite y le recorta el alcance.
+  baseDamage: 39.2
+  launchSpeedMph: 45
+  accelerationRate: 97
+  requiredEnergy: 114
+  clashPower: 63.8
+  abilityType: 3
+  abilityMagnitude: 1.45
+  effectDuration: 1.9
+  protoformSprite: {fileID: 0}
+  velocimorphSprite: {fileID: 0}
+  elementColor: {r: 0.43529412, g: 0.8392157, b: 0.9019608, a: 1}
+  velocimorphAuraColor: {r: 0.6611765, g: 0.9035294, b: 0.9411765, a: 1}

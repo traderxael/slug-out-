@@ -1,0 +1,34 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 169a931c15d0e284188fe761457fcd79, type: 3}
+  m_Name: tormenta
+  m_EditorClassIdentifier: Assembly-CSharp::SlugOut.Slugs.SlugData
+  slugId: tormenta
+  slugName: Tormenta
+  description: 'Tormenta (Epica, Electric): Rapido; puede golpear dos veces. Escala 1,80x sobre la base del elemento.'
+  element: 4
+  habitat: Vetas metalicas y cristales cargados.
+  conducta: Salta entre paredes cargadas; el ruido la atrae.
+  uso: Golpea dos veces y es de las mas rapidas.
+  limitacion: 'Se descarga: necesita recargar tras dos tiros.'
+  baseDamage: 54
+  launchSpeedMph: 67
+  accelerationRate: 136
+  requiredEnergy: 111
+  clashPower: 86.4
+  abilityType: 0
+  abilityMagnitude: 32.4
+  effectDuration: 0
+  protoformSprite: {fileID: 0}
+  velocimorphSprite: {fileID: 0}
+  elementColor: {r: 0.9098039, g: 0.83137256, b: 0.2901961, a: 1}
+  velocimorphAuraColor: {r: 0.9458824, g: 0.89882356, b: 0.57411766, a: 1}

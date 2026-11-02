@@ -1,0 +1,34 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 169a931c15d0e284188fe761457fcd79, type: 3}
+  m_Name: enigma
+  m_EditorClassIdentifier: Assembly-CSharp::SlugOut.Slugs.SlugData
+  slugId: enigma
+  slugName: Enigma
+  description: 'Enigma tipo Energy de energia pura: su impacto atraviesa cualquier guardia.'
+  element: 7
+  habitat: Camaras de cristal que vibran.
+  conducta: Flota y pulsa; se aleja del metal.
+  uso: Empuja con fuerza sin quemar.
+  limitacion: 'Es inestable: falla si el tiro sale muy corto.'
+  baseDamage: 37
+  launchSpeedMph: 53
+  accelerationRate: 98
+  requiredEnergy: 108
+  clashPower: 59
+  abilityType: 6
+  abilityMagnitude: 19
+  effectDuration: 3
+  protoformSprite: {fileID: 0}
+  velocimorphSprite: {fileID: 0}
+  elementColor: {r: 0.7, g: 0.25, b: 0.9, a: 1}
+  velocimorphAuraColor: {r: 0.92, g: 0.55, b: 0.74, a: 1}

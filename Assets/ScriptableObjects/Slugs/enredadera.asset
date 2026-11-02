@@ -1,0 +1,34 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 169a931c15d0e284188fe761457fcd79, type: 3}
+  m_Name: enredadera
+  m_EditorClassIdentifier: Assembly-CSharp::SlugOut.Slugs.SlugData
+  slugId: enredadera
+  slugName: Enredadera
+  description: Enredadera tipo Plant que enreda y prende fuego lento con sus zarcillos.
+  element: 6
+  habitat: Raices y musgo junto al agua.
+  conducta: Se enrosca en las raices; se cierra si la tocas.
+  uso: Cura al explorador cuando impacta.
+  limitacion: El fuego la quema y si falla el tiro no cura nada.
+  baseDamage: 27
+  launchSpeedMph: 43
+  accelerationRate: 90
+  requiredEnergy: 95
+  clashPower: 44
+  abilityType: 5
+  abilityMagnitude: 1.8
+  effectDuration: 3
+  protoformSprite: {fileID: 0}
+  velocimorphSprite: {fileID: 0}
+  elementColor: {r: 0.2, g: 0.68, b: 0.3, a: 1}
+  velocimorphAuraColor: {r: 0.62, g: 0.808, b: 0.38000003, a: 1}

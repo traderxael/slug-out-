@@ -1,0 +1,34 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 169a931c15d0e284188fe761457fcd79, type: 3}
+  m_Name: bubbaleone
+  m_EditorClassIdentifier: Assembly-CSharp::SlugOut.Slugs.SlugData
+  slugId: bubbaleone
+  slugName: Bubbaleone
+  description: Bubbaleone tipo Water que controla corrientes y se cura en pleno combate.
+  element: 1
+  habitat: Pozas y cursos de agua subterraneos.
+  conducta: Se mueve pegada al agua; desconfia si te acercas por la orilla seca.
+  uso: Frena al rival y le corta la carga.
+  limitacion: Lejos del agua pierde casi toda la fuerza.
+  baseDamage: 30
+  launchSpeedMph: 45
+  accelerationRate: 85
+  requiredEnergy: 95
+  clashPower: 48
+  abilityType: 1
+  abilityMagnitude: 12
+  effectDuration: 3
+  protoformSprite: {fileID: 0}
+  velocimorphSprite: {fileID: 0}
+  elementColor: {r: 0.15, g: 0.55, b: 1, a: 1}
+  velocimorphAuraColor: {r: 0.59000003, g: 0.73, b: 0.8, a: 1}

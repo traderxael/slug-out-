@@ -39,7 +39,6 @@ namespace SlugOut.World
         }
         private Vector3 ReadInput()
         {
-        }
             float x = 0f, z = 0f;
 #if ENABLE_INPUT_SYSTEM
             Keyboard kb = Keyboard.current;

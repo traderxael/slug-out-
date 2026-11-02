@@ -1,0 +1,34 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 169a931c15d0e284188fe761457fcd79, type: 3}
+  m_Name: infierno
+  m_EditorClassIdentifier: Assembly-CSharp::SlugOut.Slugs.SlugData
+  slugId: infierno
+  slugName: Infierno
+  description: Infierno tipo Fire capaz de desatar llamaradas devastadoras al superar las 100 MPH.
+  element: 0
+  habitat: Grietas calientes, cerca de las fumarolas.
+  conducta: Se queda quieta juntando calor; un paso fuerte la hace saltar.
+  uso: Quema y obliga al rival a retroceder.
+  limitacion: El agua la apaga y a los que esquivan de lado no los toca.
+  baseDamage: 38
+  launchSpeedMph: 48
+  accelerationRate: 90
+  requiredEnergy: 100
+  clashPower: 55
+  abilityType: 0
+  abilityMagnitude: 15
+  effectDuration: 3
+  protoformSprite: {fileID: 0}
+  velocimorphSprite: {fileID: 0}
+  elementColor: {r: 1, g: 0.35, b: 0.1, a: 1}
+  velocimorphAuraColor: {r: 1, g: 0.61, b: 0.26000002, a: 1}
