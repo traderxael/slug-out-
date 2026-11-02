@@ -34,10 +34,12 @@ namespace SlugOut.World
         {
             _lastPosition = transform.position;
             if (logMovement) Debug.Log("[PlayerController] inicio en " + transform.position);
+            // asegurar modelo 3D del jugador
+            if (GetComponent<PlayerModel>() == null) gameObject.AddComponent<PlayerModel>();
         }
-
         private Vector3 ReadInput()
         {
+        }
             float x = 0f, z = 0f;
 #if ENABLE_INPUT_SYSTEM
             Keyboard kb = Keyboard.current;
