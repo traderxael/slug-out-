@@ -32,6 +32,16 @@ namespace SlugOut.World
         [SerializeField] private float enemySpeed = 3.0f;
         [SerializeField] private float enemyDamage = 7f;
 
+        /// Balance A tactico: la curva de la campana se diseno sobre una base de 8 y el
+        /// objetivo es 7. Se escala la curva entera (no los saltos ni el resto de valores)
+        /// para conservar la progresion de los 28 niveles.
+        public const float DanoEnemigoReferencia = 8f;
+        public const float DanoEnemigoObjetivo = 7f;
+        public static float AjusteDanoEnemigoTactico(float danoDeCurva)
+        {
+            return danoDeCurva * (DanoEnemigoObjetivo / DanoEnemigoReferencia);
+        }
+
         [Header("Estado (solo lectura)")]
         [SerializeField] private int score = 0;
         [SerializeField] private int spawned = 0;
@@ -39,17 +49,27 @@ namespace SlugOut.World
         [SerializeField] private int playerHpRounded = 0;
         [SerializeField] private int killsThisWave = 0;
         [SerializeField] private int capturadas = 0;
+        [SerializeField] private int refuerzos = 0;
         [SerializeField] private System.Collections.Generic.List<string> coleccion = new System.Collections.Generic.List<string>();
         [SerializeField] public string outcome = "en curso";
 
         private readonly List<GameObject> _alive = new List<GameObject>();
+        /// Los sífilos que invoca el tejedor (S3): no son enemigos del nivel (no cuentan para
+        /// las apariciones ni para la cuota de capturas), asi que van en su propia lista.
+        private readonly List<GameObject> _sifilos = new List<GameObject>();
         private SlugData[] _orden;
         private float _timer;
         private int _nextIndex;
         private SlugActor _playerActor;
         private bool _finished;
+        private bool _avisoLimite;
         private int goalCapturas;
         private bool _infinito;
+        /// Numero de nivel de campana del nivel en curso (0 en infinito). Vive como campo
+        /// porque el final de partida se evalua en Update, fuera del metodo que recibio cfg.
+        private int _nivelActual;
+        /// Oleada para la que ya se aplico la vida del jugador en el modo infinito.
+        private int _oleadaVida = 1;
 
         public int GoalCapturas { get { return goalCapturas; } }
         public bool Termino { get { return _finished; } }
@@ -65,11 +85,44 @@ namespace SlugOut.World
 
         public int Score { get { return score; } }
         public int Capturadas { get { return capturadas; } }
+        /// Ultima especie capturada: el aviso del HUD la nombra en vez de decir solo "babosa".
+        public string UltimaCaptura { get; private set; } = "";
+        public Color UltimaCapturaColor { get; private set; } = Color.cyan;
         public string ColeccionTexto { get { return string.Join(", ", coleccion.ToArray()); } }
         public int Spawned { get { return spawned; } }
         public int TotalEnemies { get { return totalEnemies; } }
         public int Alive { get { return aliveCount; } }
         public int Capturas { get { return capturadas; } }
+        /// Apariciones extra cuando la cuota de capturas ya no era alcanzable con lo que quedaba.
+        public int Refuerzos { get { return refuerzos; } }
+
+        /// El nivel solo puede ganarse capturando `objetivo` babosas. Si el jugador bajo (mato)
+        /// demasiadas, `total - spawned + vivos` puede quedar por debajo de lo que falta: ahi el
+        /// nivel se quedaba sin enemigos, sin final y sin forma de ganar. Refuerzo = una aparicion
+        /// extra para que la cuota vuelva a estar al alcance. Funcion pura para probarla en EditMode.
+        public static bool NecesitaRefuerzo(int total, int spawned, int vivos, int objetivo, int capturadas)
+        {
+            if (objetivo <= 0) return false;          // infinito: no hay cuota que sostener
+            int faltan = objetivo - capturadas;
+            if (faltan <= 0) return false;            // cuota ya cumplida
+            int posibles = Mathf.Max(0, total - spawned) + Mathf.Max(0, vivos);
+            return posibles < faltan;
+        }
+
+        /// S3: reparto de roles nuevos dentro de la campana. Los arquetipos (volador, tejedor
+        /// y excavador) existian en el codigo pero ningun asset del roster los traia: eran
+        /// codigo muerto. En vez de tocar los 64 .asset del roster (que son de otra sesion), el
+        /// rol se reparte por nivel y numero de aparicion: determinista (la campana es
+        /// reproducible) y con la frecuencia acotada para que el nivel siga siendo jugable.
+        /// El excavador manda sobre el tejedor y el tejedor sobre el volador: una aparicion es
+        /// UN rol, nunca tres a la vez.
+        public static SlugData.RolEnemigo RolDeCampana(int nivel, int indice)
+        {
+            if (nivel >= 16 && indice % 13 == 7) return SlugData.RolEnemigo.Excavador;
+            if (nivel >= 12 && indice % 11 == 5) return SlugData.RolEnemigo.Tejedor;
+            if (nivel >= 8 && indice % 7 == 2) return SlugData.RolEnemigo.Volador;
+            return SlugData.RolEnemigo.Normal;
+        }
 
         /// Arranque directo para pruebas: mismo camino que GameFlow, y se baja el menu
         /// para que GameFlow no vuelva a congelar al cuadro siguiente.
@@ -99,8 +152,14 @@ namespace SlugOut.World
                 // para asentar cada prop y no reemplaza nada de la escena.
                 if (suelo.GetComponent<RegionCuevaSeca>() == null)
                     suelo.AddComponent<RegionCuevaSeca>();
+                if (suelo.GetComponent<LookCuevaPixar>() == null)
+                    suelo.AddComponent<LookCuevaPixar>();
             }
             if (usarRocas && GetComponent<RockShower>() == null) gameObject.AddComponent<RockShower>();
+            // La voz vive en la arena desde el arranque: StoryPanel la busca en su primer Update
+            // y los duelistas la usan al aparecer. Un AudioSource propio, no el de ArenaMusic.
+            if (GetComponent<VozPlayer>() == null) gameObject.AddComponent<VozPlayer>();
+            if (GetComponent<EcosCuevaManager>() == null) gameObject.AddComponent<EcosCuevaManager>();
         }
 
         private void Start()
@@ -116,7 +175,7 @@ namespace SlugOut.World
             if (cfg.total == 0) cfg = NivelConfig.Campana(1);
             if (player == null)
             {
-                PlayerController pc = Object.FindFirstObjectByType<PlayerController>();
+                PlayerController pc = Object.FindAnyObjectByType<PlayerController>();
                 if (pc != null) player = pc.transform;
             }
             roster = SlugRoster.Todos;
@@ -131,12 +190,18 @@ namespace SlugOut.World
             maxAlive = cfg.maxVivos;
             spawnInterval = cfg.intervalo;
             enemySpeed = cfg.velocidad;
-            enemyDamage = cfg.dano;
+            enemyDamage = AjusteDanoEnemigoTactico(cfg.dano);
             goalCapturas = cfg.capturas;
             _infinito = cfg.infinito;
+            _nivelActual = cfg.nivel;
+            // La historia pertenece al nivel que arranca: la arena se lo dice al panel, que ya
+            // no adivina por capturas. Cubre NUEVA AVENTURA, CONTINUAR, SIGUIENTE, EXPLORAR y REINTENTAR.
+            StoryPanel historia = GetComponent<StoryPanel>();
+            if (historia != null) historia.MostrarNivelActual(cfg.nivel, _infinito);
             if (slugElegido != null) playerSlug = slugElegido;
 
             ReiniciarPartida();
+            _oleadaVida = 1;
             // Semilla por run: se sortea UNA vez y se loguea. Con la misma semilla el orden de
             // nacimiento, el momento del primer salto y la fase del zigzag son los mismos; antes
             // dependian del Random global de Unity, que mueve cualquier otro lanzamiento del proyecto.
@@ -158,6 +223,18 @@ namespace SlugOut.World
                 PlayerShooter shooter = player.GetComponent<PlayerShooter>();
                 if (shooter == null) shooter = player.gameObject.AddComponent<PlayerShooter>();
                 shooter.SetData(playerSlug);
+
+                // Progresion del jugador: la vida y el cargador mejoran con la campana. Antes
+                // la vida era 120 fijos contra un dano que subia 4 -> 17 y un cargador que no
+                // daba los disparos que el nivel pedia: medido en Play, la campana se trababa
+                // en el nivel 9. Ver SlugCampaign para los numeros y para el modelo.
+                int nivelDeReferencia = _infinito ? NivelConfig.TotalNiveles : cfg.nivel;
+                _playerActor.FijarVidaMaxima(_infinito
+                    ? NivelConfig.VidaDelJugadorEnInfinito(1)
+                    : NivelConfig.VidaDelJugador(nivelDeReferencia));
+                shooter.SetRecargaPorTubo(NivelConfig.RecargaPorTuboParaNivel(nivelDeReferencia));
+                shooter.SetPenalizacionDisparoPesado(
+                    NivelConfig.PenalizacionDisparoPesadoParaNivel(nivelDeReferencia));
                 // OJO: la escena ya puede traer su propio SlugAnimator — no duplicar,
                 // dos animators se pelean por escala/posicion/rotacion del transform.
                 if (player.GetComponent<SlugAnimator>() == null)
@@ -167,8 +244,14 @@ namespace SlugOut.World
                 if (hab == null) hab = player.gameObject.AddComponent<PlayerAbilities>();
                 hab.Configurar(playerSlug, _playerActor);
 
+                PlayerDodge dodge = player.GetComponent<PlayerDodge>();
+                if (dodge == null) dodge = player.gameObject.AddComponent<PlayerDodge>();
+
                 if (usarShane) AttachShane(player.gameObject, playerSlug);
                 else AttachModel(player.gameObject, playerSlug, new Vector3(0f, -1f, 0f), true);   // el heroe siempre evolucionado
+                AdjuntarCompanero(player.gameObject, playerSlug);
+                // S6: mejoras permanentes del escondite se aplican al iniciar cada nivel.
+                Escondite.AplicarAlJugador(_playerActor, shooter);
                 Debug.Log("[SlugArena] jugador = " + playerSlug.slugName + " (" + playerSlug.element + ") hp=" + _playerActor.MaxHp.ToString("F1") + " objetivo=" + (goalCapturas > 0 ? "capturar " + goalCapturas : "bajar a todos"));
             }
 
@@ -185,6 +268,9 @@ namespace SlugOut.World
             if (_orden == null) return;
             if (_finished || roster == null || roster.Length == 0) return;
 
+            // Ecos de la cueva: avanza el temporizador y ofrece mejoras dentro del nivel.
+            if (EcosCuevaManager.Instancia != null) EcosCuevaManager.Instancia.Tick(Time.deltaTime);
+
             // OJO: contar la baja y sacarla del listado en la MISMA pasada.
             // (Antes se limpiaban arriba y el bucle que sumaba puntos ya no las veia: score quedaba en 0.)
             for (int i = _alive.Count - 1; i >= 0; i--)
@@ -198,10 +284,19 @@ namespace SlugOut.World
                     if (a != null && a.Capturada)
                     {
                         capturadas++;
+                        UltimaCaptura = a.Data != null ? a.Data.slugName : "Babosa";
+                        UltimaCapturaColor = a.Data != null ? a.Data.elementColor : Color.cyan;
                         string id = a.Data != null ? a.Data.slugId : "?";
                         if (!coleccion.Contains(id)) coleccion.Add(id);
                         StoryPanel historia = GetComponent<StoryPanel>();
                         if (historia != null) historia.AvanzarHistoria();
+                        if (EcosCuevaManager.Instancia != null) EcosCuevaManager.Instancia.NotificarCaptura();
+                        if (_playerActor != null && _playerActor.Data != null)
+                            SlugEvolucion.GanarXP(_playerActor.Data.slugId, SlugEvolucion.XpDeCaptura);
+                        // S6: cristales y logros por captura.
+                        Escondite.GanarCristales(5);
+                        Logros.Desbloquear("primera_captura");
+                        if (capturadas >= 10) Logros.Desbloquear("coleccionista");
                         Debug.Log("[SlugArena] CAPTURADA " + (a.Data != null ? a.Data.slugName : "(sin datos)") +
                             " total=" + capturadas + " coleccion=" + coleccion.Count);
                     }
@@ -214,15 +309,48 @@ namespace SlugOut.World
                 }
             }
 
+            // S3: los sífilos del tejedor se limpian aparte (no son enemigos del nivel).
+            for (int i = _sifilos.Count - 1; i >= 0; i--)
+            {
+                GameObject g = _sifilos[i];
+                SlugActor a = g != null ? g.GetComponent<SlugActor>() : null;
+                if (g == null || a == null || !a.Alive)
+                {
+                    _sifilos.RemoveAt(i);
+                    if (g != null) Destroy(g);
+                }
+            }
+
             aliveCount = _alive.Count;
             playerHpRounded = _playerActor != null ? Mathf.RoundToInt(_playerActor.Hp) : 0;
+
+            // En infinito la vida sigue creciendo con la oleada (misma progresion que la
+            // campana): el jugador entra con la vida del final de la campaña y cada oleada le
+            // suma la suya. Sin esto, el infinito empezaba con un escalón de 260 de vida.
+            if (_infinito && _playerActor != null && OlaActual != _oleadaVida)
+            {
+                float antes = NivelConfig.VidaDelJugadorEnInfinito(_oleadaVida);
+                float ahora = NivelConfig.VidaDelJugadorEnInfinito(OlaActual);
+                _oleadaVida = OlaActual;
+                _playerActor.AumentarVidaMaxima(ahora - antes);
+                Debug.Log("[SlugArena] oleada " + OlaActual + ": vida maxima " +
+                    _playerActor.MaxHp.ToString("F0"));
+            }
 
             // La arena tiene limites: sin esto el jugador se iba caminando del escenario.
             if (player != null && _playerActor != null && _playerActor.Alive)
             {
                 Vector3 pp = player.position;
-                pp.x = Mathf.Clamp(pp.x, -arenaLimit, arenaLimit);
-                pp.z = Mathf.Clamp(pp.z, -arenaLimit, arenaLimit);
+                float cx = Mathf.Clamp(pp.x, -arenaLimit, arenaLimit);
+                float cz = Mathf.Clamp(pp.z, -arenaLimit, arenaLimit);
+                if ((cx != pp.x || cz != pp.z) && !_avisoLimite)
+                {
+                    _avisoLimite = true;
+                    Debug.LogWarning("[SlugArena] el clamp de arena recorto al jugador en "
+                        + pp.ToString("F1") + ": el anillo de muros no lo freno.");
+                }
+                pp.x = cx;
+                pp.z = cz;
                 player.position = pp;
             }
 
@@ -241,9 +369,27 @@ namespace SlugOut.World
                 _finished = true;
                 CombateCongelado = true;
                 Debug.Log("[SlugArena] GANASTE. score=" + score + " capturadas=" + capturadas + " de " + totalEnemies);
+                // S6: cristales, estrellas y logros al ganar.
+                Escondite.GanarCristales(20);
+                int numEstrellas = Estrellas.Calcular(true, capturadas, goalCapturas,
+                    _playerActor != null ? _playerActor.Hp : 0f,
+                    _playerActor != null ? _playerActor.MaxHp : 1f);
+                Estrellas.Guardar(_nivelActual, numEstrellas);
+                if (_nivelActual >= NivelConfig.TotalNiveles)
+                {
+                    Logros.Desbloquear("campana_completa");
+                    Logros.Desbloquear("cinco_estrellas"); // se verifica con estrellas totales
+                }
                 if (GameFlow.Activo != null) GameFlow.Activo.NivelSuperado(GameFlow.Activo.Nivel);
                 StoryPanel historia = GetComponent<StoryPanel>();
-                if (historia != null) historia.AvanzarHistoria();
+                if (historia != null)
+                {
+                    historia.AvanzarHistoria();
+                    // El 28 es el unico nivel con cierre: epilogo + boton al infinito en el HUD.
+                    if (GameFlow.Activo != null
+                        && GameFlow.EsFinalDeCampana(true, _infinito, GameFlow.Activo.Nivel))
+                        historia.MostrarEpilogo();
+                }
                 if (player != null)
                 {
                     SlugAnimator an = player.GetComponent<SlugAnimator>();
@@ -252,11 +398,21 @@ namespace SlugOut.World
                 return;
             }
 
-            if (spawned >= totalEnemies || _alive.Count >= maxAlive) return;
+            // El refuerzo solo se decide despues de purgar bajas: _alive.Count es el numero real
+            // de vivos y con el se calcula si la cuota de capturas sigue siendo alcanzable.
+            bool refuerzo = NecesitaRefuerzo(totalEnemies, spawned, _alive.Count, goalCapturas, capturadas);
+            if ((spawned >= totalEnemies && !refuerzo) || _alive.Count >= maxAlive) return;
 
             _timer -= Time.deltaTime;
             if (_timer > 0f) return;
             _timer = spawnInterval;
+            if (refuerzo)
+            {
+                refuerzos++;
+                Debug.Log("[SlugArena] refuerzo " + refuerzos + ": quedaban " + _alive.Count +
+                    " vivos y " + (totalEnemies - spawned) + " por aparecer para " +
+                    (goalCapturas - capturadas) + " capturas pendientes");
+            }
             SpawnEnemy();
         }
 
@@ -270,19 +426,30 @@ namespace SlugOut.World
             playerHpRounded = 0;
             killsThisWave = 0;
             capturadas = 0;
+            refuerzos = 0;
+            UltimaCaptura = "";
+            UltimaCapturaColor = Color.cyan;
             coleccion.Clear();
             outcome = "en curso";
             // hay que DESTRUIR los enemigos del arranque anterior: solo sacarlos del listado
             // deja babosas vivas persiguiendo al jugador sin que nadie las cuente
             foreach (GameObject g in _alive) if (g != null) Destroy(g);
             _alive.Clear();
+            foreach (GameObject g in _sifilos) if (g != null) Destroy(g);
+            _sifilos.Clear();
             _nextIndex = 0;
             _timer = 0f;
             _finished = false;
             CombateCongelado = false;
+            if (EcosCuevaManager.Instancia != null) EcosCuevaManager.Instancia.ReiniciarNivel();
             // el anillo invertido es estado del nivel, no del actor: si Iniciar() no lo vuelve
             // a poner, el modo infinito heredaria la ley del ultimo nivel de campana
             SlugActor.AnilloInvertido = false;
+            _avisoLimite = false;
+            PlayerController pc = player != null
+                ? player.GetComponent<PlayerController>()
+                : Object.FindAnyObjectByType<PlayerController>();
+            if (pc != null) pc.Colocar(Vector3.zero);
         }
 
         /// Orden de aparicion round-robin por elemento (estable, reproducible): cada tanda trae
@@ -351,10 +518,19 @@ namespace SlugOut.World
         {
             SlugData d = _orden[_nextIndex % _orden.Length];
             if (d == null) return;
+            int indice = _nextIndex;
             _nextIndex++;
 
             float ang = _nextIndex * 2.39996f;
             Vector3 pos = new Vector3(Mathf.Cos(ang) * spawnRadius, 0f, Mathf.Sin(ang) * spawnRadius);
+
+            // El enemigo NO puede nacer dentro de un pilar o de una roca. Medido en Play:
+            // seis de las 28 posiciones de aparicion caian dentro de un solido (spawn 03,
+            // 13, 14, 16, 24 y 26). Ahi el enemigo queda atrapado, la IA choca contra el
+            // proxy, el jugador tampoco lo alcanza con el tiro y el nivel no se termina
+            // NUNCA. Se busca el punto libre antes de crear el bicho.
+            pos = ColisionJugador.PuntoLibre(pos, -pos,
+                ColisionJugador.RadioDefecto, ColisionJugador.AltoDefecto);
 
             GameObject go = new GameObject("Enemigo_" + d.slugId);
             go.transform.position = pos;
@@ -369,8 +545,19 @@ namespace SlugOut.World
             bool usedModel = montado || AttachModel(go, d, Vector3.zero, evolucionado);
             SlugActor actor = go.AddComponent<SlugActor>();
             actor.Configure(d, false);
+            // S3: el rol lo fija el asset; si el asset no lo trae, lo reparte la campana.
+            SlugData.RolEnemigo rol = d.rolEnemigo != SlugData.RolEnemigo.Normal
+                ? d.rolEnemigo
+                : RolDeCampana(_nivelActual, indice);
+            EnemySlugAI.Arquetipo arq = EnemySlugAI.ArquetipoDe(d, rol);
+            // S3: estado inicial de los enemigos nuevos. El volador vuela desde el principio;
+            // el excavador sale a la superficie (la IA lo entierra en su ciclo) porque nacer
+            // enterrado son 6 s de invulnerabilidad y de tiro perdido.
+            if (arq == EnemySlugAI.Arquetipo.Volador) actor.SetVolando(true);
+            if (arq == EnemySlugAI.Arquetipo.Excavador) actor.SetEnterrado(false);
             EnemySlugAI ai = go.AddComponent<EnemySlugAI>();
-            ai.SetArquetipo(EnemySlugAI.ArquetipoDe(d));
+            ai.SetArquetipo(arq);
+
             ai.SetTarget(player);
             ai.SetDamage(enemyDamage);
             if (evolucionado)
@@ -389,14 +576,110 @@ namespace SlugOut.World
             {
                 ai.SetSpeed(Mathf.Min(enemySpeed * 1.6f, enemySpeed + _nextIndex * 0.08f));
             }
+
+            // Élite: probabilidad que crece con la oleada. Va DESPUES de la rampa de daño y
+            // velocidad: antes la elite multiplicaba los valores de la IA y enseguida los
+            // sobrescribian con SetDamage/SetSpeed, asi que "Furia" y "Prisa" no hacian nada.
+            // El jefe (Dr. Blakk, el ultimo enemigo de cada nivel) jamas sale elite: con
+            // "Vigor + Sangre" (x2 vida + regeneracion) el nivel 1 pasaba de ganarse en 27 s a
+            // quedarse en TOPE 90 s, y ya tiene sus propias 3 fases (DrBlakkFases).
+            if (duelista != DuelistaMazo.Jefe && ProbabilidadElite(OlaActual) < Random.value)
+            {
+                var rng = new System.Random();
+                int n = rng.Next(1, 3); // 1 o 2 modificadores
+                var mods = new EliteModificador[n];
+                var usados = new System.Collections.Generic.HashSet<int>();
+                for (int i = 0; i < n; i++)
+                {
+                    int idx;
+                    do { idx = rng.Next(_elites.Length); } while (usados.Contains(idx));
+                    usados.Add(idx);
+                    mods[i] = _elites[idx];
+                }
+                var elite = go.AddComponent<EliteEstado>();
+                elite.modificadores = mods;
+                elite.Aplicar(actor, ai);
+                Debug.Log("[SlugArena] ELITE " + elite.Nombres() + " en " + d.slugName);
+            }
+
             go.AddComponent<SlugAnimator>();
 
             _alive.Add(go);
             spawned++;
             aliveCount = _alive.Count;
-            if (montado) actor.MultiplicarHp(duelista == DuelistaMazo.Jefe ? 2.5f : 1.5f);
+            if (montado)
+            {
+                actor.MultiplicarHp(duelista == DuelistaMazo.Jefe ? 2.5f : 1.5f);
+                int indiceFrase;
+                string frase = DuelistaVoces.Siguiente(duelista, out indiceFrase);
+                DuelistaMarca marca = go.AddComponent<DuelistaMarca>();
+                marca.Configurar(duelista, frase, indiceFrase);
+                if (VozPlayer.Instancia != null)
+                    marca.FijarDuracionFrase(VozPlayer.Instancia.PlayDuelista(duelista, indiceFrase));
+                // S4: Dr. Blakk a 3 fases (fase 2 = anillo al revés).
+                if (duelista == DuelistaMazo.Jefe)
+                    go.AddComponent<DrBlakkFases>();
+            }
             Debug.Log("[SlugArena] spawn " + d.slugName + " (" + d.element + ") modelo="
-                + (montado ? "duelista:" + duelista : (usedModel ? "OBJ" : "capsula")));
+                + (montado ? "duelista:" + duelista : (usedModel ? "malla" : "capsula")));
+        }
+
+        // ------------------------------------------------------------------ élites (S3)
+
+        static readonly EliteModificador[] _elites =
+        {
+            new EliteModificador { id = "elite_vigor", nombre = "Vigor", hpMultiplicador = 2f, badgeColor = new Color(0.4f, 0.9f, 0.4f) },
+            new EliteModificador { id = "elite_furia", nombre = "Furia", danoMultiplicador = 1.5f, badgeColor = new Color(0.95f, 0.4f, 0.35f) },
+            new EliteModificador { id = "elite_prisa", nombre = "Prisa", velocidadMultiplicador = 1.4f, badgeColor = new Color(0.9f, 0.9f, 0.35f) },
+            new EliteModificador { id = "elite_espejo", nombre = "Espejo", reflejaDanio = true, reflejaFraccion = 0.25f, badgeColor = new Color(0.6f, 0.5f, 0.9f) },
+            new EliteModificador { id = "elite_sangre", nombre = "Sangre", regeneracion = true, regenPorSegundo = 2f, badgeColor = new Color(0.8f, 0.3f, 0.5f) },
+        };
+
+        /// Probabilidad de que un enemigo nazca élite: baja al principio, crece con nivel/oleada.
+        static float ProbabilidadElite(int nivelOla)
+        {
+            return Mathf.Clamp01(0.05f + (nivelOla - 1) * 0.02f);
+        }
+
+        /// Sífilo del tejedor: enemigo diminuto de 1 HP, no capturable, suma presión.
+        public void SpawnSifilo(Vector3 pos, Transform target)
+        {
+            pos = ColisionJugador.PuntoLibre(pos, Vector3.zero,
+                ColisionJugador.RadioDefecto, ColisionJugador.AltoDefecto);
+
+            GameObject go = new GameObject("Sifilo");
+            go.transform.position = pos;
+            go.transform.rotation = Quaternion.LookRotation((Vector3.zero - pos).normalized, Vector3.up);
+
+            SlugActor actor = go.AddComponent<SlugActor>();
+            ConfigurarSifilo(actor);
+
+            EnemySlugAI ai = go.AddComponent<EnemySlugAI>();
+            ai.SetArquetipo(EnemySlugAI.Arquetipo.Frenetico);
+            ai.SetTarget(target);
+            ai.SetSpeed(5f);
+            ai.SetDamage(2f);
+
+            go.AddComponent<SlugAnimator>();
+            // El sífilo NO cuenta como enemigo del nivel: no entra en _alive ni en `spawned`.
+            // Si contara, se comería una aparición del roster (el nivel perdería un enemigo de
+            // verdad) y la cuota de capturas se calcularía con un enemigo que no se puede
+            // capturar. Se lleva en su propia lista y se limpia en el mismo barrido.
+            _sifilos.Add(go);
+            Debug.Log("[SlugArena] spawn sifilo");
+        }
+
+        /// Un sífilo es de 1 HP y NUNCA capturable: si lo fuera, contaría para la cuota de
+        /// capturas (la colección y la historia) y el tejedor "ganaría" niveles solo.
+        public static void ConfigurarSifilo(SlugActor actor)
+        {
+            if (actor == null) return;
+            var dato = new SlugData { slugId = "sifilo", slugName = "Sífilo", element = ElementType.Toxic,
+                baseDamage = 3f, clashPower = 10f, elementColor = Color.green };
+            actor.Configure(dato, false);
+            actor.FijarVidaMaxima(1f);
+            actor.FijarUmbralCaptura(1f); // a vida completa ya cumplira el umbral
+            actor.FijarCapturable(false);
         }
 
         /// Monta un duelistas del mazo en lugar de la babosa. Conserva la paleta que salio de
@@ -432,16 +715,28 @@ namespace SlugOut.World
                     {
                         Material tinte = new Material(m);
                         tinte.color = colorTubo;
+                        // Mismo emissive que el heroe (MaterialesPixar.PrepararHeroe): los
+                        // ribetes del equipo son lo que separa al duelista del fondo de la
+                        // cueva, y tenidos pero no emisivos se leen como un color plano mas.
+                        MaterialesPixar.SetEmision(tinte, colorTubo * 1.1f);
                         m = tinte;
+                    }
+                    else if (m != null)
+                    {
+                        // Autobrillo de la propia albedo: el mismo criterio que el heroe y
+                        // las babosas. Sin esto el duelista se lee como una silueta oscura
+                        // contra el piso azul de la cueva, sobre todo de noche.
+                        Material t = new Material(m);
+                        MaterialesPixar.SetEmision(t, MaterialesPixar.ColorBase(t) * 0.22f);
+                        m = t;
                     }
                     copia[i] = m;
                 }
                 mr.sharedMaterials = copia;
             }
 
-            Texture2D tex = LoadSprite(d, true);
-            if (tex != null) PonerRetrato(actor, tex, 2.35f);
-
+            // Sin cartel-retrato: un duelista 3D ya se identifica por el modelo y el
+            // nameplate del HUD. El billboard tapaba media pantalla sobre la accion.
             // El cuerpo lo mueve DuelistaAnimator por huesos; SlugAnimator sigue a cargo
             // del raiz (squash, flash, lunge), asi que los dos no se pisan.
             DuelistaAnimator.Obtener(actor, DuelistaAnimator.Modo.Duelista);
@@ -452,10 +747,19 @@ namespace SlugOut.World
         /// como el elemento de la municion y del retrato flotante.
         private static void AttachShane(GameObject actor, SlugData cargada)
         {
-            GameObject modelo = Resources.Load<GameObject>("Shane/shane");
+            GameObject modelo = Resources.Load<GameObject>("Shane/shane_pixar");
+            bool pixar = modelo != null;
+            bool fbx = false;
             if (modelo == null)
             {
-                Debug.LogWarning("[SlugArena] falta Resources/Shane/shane.obj: cae a la babosa");
+                modelo = Resources.Load<GameObject>("Shane/shane_pixar_fbx");
+                pixar = modelo != null;
+                fbx = pixar;
+            }
+            if (modelo == null) modelo = Resources.Load<GameObject>("Shane/shane");
+            if (modelo == null)
+            {
+                Debug.LogWarning("[SlugArena] falta Resources/Shane/shane_pixar, shane_pixar_fbx y shane: cae a la babosa");
                 AttachModel(actor, cargada, new Vector3(0f, -1f, 0f), true);
                 return;
             }
@@ -465,51 +769,78 @@ namespace SlugOut.World
             // tambien corta la acumulacion de cuerpos y retratos repetidos.
             DescartarHijos(actor, "Cuerpo_Shane");
             DescartarHijos(actor, "Retrato");
+            DescartarHeroesViejos(actor);
 
             GameObject inst = UnityEngine.Object.Instantiate(modelo, actor.transform);
             inst.name = "Cuerpo_Shane";
-            inst.transform.localPosition = new Vector3(0f, -0.9f, 0f);
+            inst.transform.localPosition = pixar ? new Vector3(0f, -1f, 0f) : new Vector3(0f, -0.9f, 0f);
             inst.transform.localRotation = Quaternion.identity;
-            inst.transform.localScale = Vector3.one * 1.15f;
+            inst.transform.localScale = Vector3.one * (pixar ? 1f : 1.15f);
 
             MeshRenderer propio = actor.GetComponent<MeshRenderer>();
             if (propio != null) propio.enabled = false;
 
             Color colorTubo = cargada != null ? cargada.elementColor : Color.yellow;
-            foreach (Renderer mr in inst.GetComponentsInChildren<Renderer>(true))
+            if (pixar)
             {
-                Material[] originales = mr.sharedMaterials;
-                if (originales == null || originales.Length == 0) continue;
-                Material[] tintados = new Material[originales.Length];
-                for (int i = 0; i < originales.Length; i++)
-                {
-                    string prenda = PrendaDeShane(mr.gameObject.name,
-                        originales[i] != null ? originales[i].name : null);
-                    Color c = ColorDeShane(prenda, colorTubo);
-                    Material m = new Material(Shader.Find("Universal Render Pipeline/Lit"));
-                    m.color = c;
-                    if (prenda == "Tubos")
-                    {
-                        m.SetColor("_EmissionColor", c * 1.1f);
-                        m.EnableKeyword("_EMISSION");
-                    }
-                    tintados[i] = m;
-                }
-                mr.sharedMaterials = tintados;
+                MaterialesPixar.QuitarAnimadores(inst);
+                if (!fbx && MaterialesPixar.EsModeloTexturizado(inst))
+                    MaterialesPixar.PrepararHeroe(inst, colorTubo);
+                else
+                    MaterialesPixar.PrepararHeroeFbx(inst, colorTubo);
+                MaterialesPixar.AlinearPies(inst.transform, -1f);
             }
-            // Shane mide ~1.9 con el pelo: el retrato de la babosa cargada va por encima de la cabeza
-            Texture2D tex = LoadSprite(cargada, false);
-            if (tex != null) PonerRetrato(actor, tex, 2.45f);
+            else
+            {
+                foreach (Renderer mr in inst.GetComponentsInChildren<Renderer>(true))
+                {
+                    Material[] originales = mr.sharedMaterials;
+                    if (originales == null || originales.Length == 0) continue;
+                    Material[] tintados = new Material[originales.Length];
+                    for (int i = 0; i < originales.Length; i++)
+                    {
+                        string prenda = PrendaDeShane(mr.gameObject.name,
+                            originales[i] != null ? originales[i].name : null);
+                        Color c = ColorDeShane(prenda, colorTubo);
+                        Material m = new Material(SlugOut.World.Shaders.Lit());
+                        m.color = c;
+                        if (prenda == "Tubos")
+                        {
+                            m.SetColor("_EmissionColor", c * 1.1f);
+                            m.EnableKeyword("_EMISSION");
+                        }
+                        tintados[i] = m;
+                    }
+                    mr.sharedMaterials = tintados;
+                }
+            }
+            // El retrato flotante era la identidad del heroe-objeto; con el modelo Pixar
+            // texturizado es un cartel gigante sobre la cabeza que tapa la accion.
+            // El heroe 3D no lleva cartel-retrato: el HUD ya muestra su retrato.
             // Con esqueleto, el heroe deja de ser una figura rigida: mantiene el brazo del
             // blaster levantado y el tiro empuja hacia atras.
             DuelistaAnimator.Obtener(actor, DuelistaAnimator.Modo.Duelista, true);
 
-            Debug.Log("[SlugArena] heroe = Eli Shane (blaster + tubos), carga elemental=" + (cargada != null ? cargada.element.ToString() : "?"));
+            Debug.Log("[SlugArena] heroe = " + (pixar ? "Shane Pixar texturizado" : "Shane legacy") +
+                " (blaster + tubos), carga elemental=" + (cargada != null ? cargada.element.ToString() : "?"));
         }
 
         /// Que prenda es un material de Shane. El OBJ viejo tenia un GameObject por prenda
         /// y esa era la clave; el FBX riggeado es UN solo SkinnedMeshRenderer con un submesh
         /// por material, asi que la prenda se lee del sufijo del nombre ("shane_campera").
+        private static void DescartarHeroesViejos(GameObject actor)
+        {
+            GameObject[] todos = UnityEngine.Object.FindObjectsByType<GameObject>();
+            for (int i = 0; i < todos.Length; i++)
+            {
+                GameObject go = todos[i];
+                if (go == null || go == actor) continue;
+                if (go.name == "shane_malla" || go.name == "shane_rig" ||
+                    (go.name == "Cuerpo_Shane" && go.transform.parent != actor.transform))
+                    go.SetActive(false);
+            }
+        }
+
         private static void DescartarHijos(GameObject padre, string nombre)
         {
             Transform[] hijos = padre.GetComponentsInChildren<Transform>(true);
@@ -543,6 +874,11 @@ namespace SlugOut.World
                 case "Pantalon": return new Color(0.13f, 0.15f, 0.20f);
                 case "Botas": return new Color(0.22f, 0.15f, 0.09f);
                 case "Tubos": return colorTubo;
+                // La cara del generador parametrico: sin estos casos los ojos caen al
+                // default metalico y el heroe legacy queda con la cara gris.
+                case "Ojos": return new Color(0.96f, 0.96f, 0.96f);
+                case "Pupila": return new Color(0.08f, 0.08f, 0.10f);
+                case "Boca": return new Color(0.48f, 0.23f, 0.18f);
                 default: return new Color(0.32f, 0.35f, 0.40f);   // Blaster y lo demas: metal
             }
         }
@@ -550,9 +886,44 @@ namespace SlugOut.World
         /// Cuelga el modelo 3D del roster como hijo. Devuelve true si encontro el OBJ.
         /// Ademas viste el cuerpo con el sprite OFICIAL del personaje (recursos/Sprites)
         /// y cuelga un retrato billboard encima, para que cada babosa se reconozca.
+        private static void AdjuntarCompanero(GameObject actor, SlugData d)
+        {
+            if (actor == null || d == null) return;
+            GameObject viejo = GameObject.Find("Companero");
+            if (viejo != null) Object.Destroy(viejo);
+            GameObject modelo = Resources.Load<GameObject>("Slugs/" + d.slugId + "_pixar");
+            bool texturado = modelo != null;
+            if (modelo == null) modelo = Resources.Load<GameObject>("Slugs/" + d.slugId);
+            if (modelo == null) return;
+
+            GameObject root = new GameObject("Companero");
+            GameObject inst = Object.Instantiate(modelo, root.transform);
+            inst.name = "Cuerpo_Companero";
+            inst.transform.localPosition = Vector3.zero;
+            inst.transform.localRotation = Quaternion.identity;
+            if (texturado) MaterialesPixar.PrepararBabosa(inst, d.slugId, d.elementColor);
+            else
+            {
+                ApplyColor(inst, d.elementColor);
+                Texture2D tex = LoadSprite(d, false);
+                if (tex != null) AplicarTextura(inst, tex, d.elementColor);
+            }
+
+            SlugCompanion comp = root.AddComponent<SlugCompanion>();
+            comp.objetivo = actor.transform;
+            Vector3 p = actor.transform.position + actor.transform.rotation * comp.offset;
+            p.y = Terrain3D.Altura(p.x, p.z) + 0.02f;
+            root.transform.position = p;
+            root.transform.rotation = Quaternion.Euler(0f, actor.transform.eulerAngles.y, 0f);
+        }
+
         private static bool AttachModel(GameObject actor, SlugData d, Vector3 localOffset, bool evolucionado)
         {
-            GameObject model = Resources.Load<GameObject>("Slugs/" + d.slugId);
+            GameObject model = Resources.Load<GameObject>("Slugs/" + d.slugId + "_pixar");
+            bool pixar = model != null;
+            if (model == null) model = Resources.Load<GameObject>("Slugs/" + d.slugId);
+            Debug.Log("[SlugArena] modelo " + d.slugId + " = "
+                + (pixar ? "pixar" : (model != null ? "legacy" : "capsula")));
             GameObject cuerpo;
             if (model == null)
             {
@@ -571,7 +942,9 @@ namespace SlugOut.World
                 inst.name = "Cuerpo_" + d.slugId;
                 inst.transform.localPosition = localOffset;
                 inst.transform.localRotation = Quaternion.identity;
-                ApplyColor(inst, d.elementColor);
+                bool texturizado = MaterialesPixar.EsModeloTexturizado(inst);
+                if (texturizado) MaterialesPixar.PrepararBabosa(inst, d.slugId, d.elementColor);
+                else ApplyColor(inst, d.elementColor);
                 cuerpo = inst;
 
                 MeshRenderer own = actor.GetComponent<MeshRenderer>();
@@ -579,18 +952,20 @@ namespace SlugOut.World
 
                 // Ondula la columna nada mas si el modelo trajo esqueleto: los demas
                 // siguen con la animacion procedural de SlugAnimator, que les queda bien.
-                if (inst.GetComponentInChildren<SkinnedMeshRenderer>(true) != null)
+                // Las babosas Pixar son estaticas a proposito: las anima SlugAnimator.
+                if (!texturizado && inst.GetComponentInChildren<SkinnedMeshRenderer>(true) != null)
                 {
                     DuelistaAnimator.Obtener(actor, DuelistaAnimator.Modo.Babosa);
                 }
             }
 
-            // identidad visual: textura oficial + retrato billboard
+            // identidad visual: el sprite oficial viste a los modelos legacy y siempre
+            // alimenta el retrato billboard. En un modelo texturizado no se pisa la textura 3D.
             Texture2D tex = LoadSprite(d, evolucionado);
             if (tex != null)
             {
-                AplicarTextura(cuerpo, tex, d.elementColor);
-                PonerRetrato(actor, tex);
+                if (!MaterialesPixar.EsModeloTexturizado(cuerpo))
+                    AplicarTextura(cuerpo, tex, d.elementColor);
             }
             return model != null;
         }
@@ -692,6 +1067,7 @@ namespace SlugOut.World
         /// Viste el cuerpo con la textura: base = sprite, glow elemental suave detras.
         private static void AplicarTextura(GameObject cuerpo, Texture2D tex, Color elemento)
         {
+            if (MaterialesPixar.EsModeloTexturizado(cuerpo)) return;
             // Renderer, no MeshRenderer: las babosas nuevas del mazo vienen FBX con
             // esqueleto y Unity las importa como SkinnedMeshRenderer. Con MeshRenderer
             // el sprite oficial no se les aplicaba y el cuerpo quedaba liso.
@@ -711,46 +1087,6 @@ namespace SlugOut.World
             }
         }
 
-        /// Cartelito con el sprite oficial girando a la camara: identidad a un vistazo.
-        private static void PonerRetrato(GameObject actor, Texture2D tex, float alto = 1.15f)
-        {
-            GameObject q = GameObject.CreatePrimitive(PrimitiveType.Quad);
-            q.name = "Retrato";
-            Collider col = q.GetComponent<Collider>();
-            if (col != null) Destroy(col);   // los tiros no golpean el cartel
-            q.transform.SetParent(actor.transform, false);
-            q.transform.localPosition = new Vector3(0f, alto, 0f);
-            q.transform.localScale = new Vector3(0.85f, 0.85f, 1f);
-
-            Shader s = Shader.Find("Universal Render Pipeline/Unlit");
-            if (s == null) s = Shader.Find("Unlit/Texture");
-            Material m = new Material(s);
-            m.mainTexture = tex;
-            if (m.HasProperty("_Cull")) m.SetFloat("_Cull", 0f);   // visible desde atras
-            // el PNG trae alfa real; con el material opaco URP el fondo transparente sale NEGRO
-            Transparentar(m);
-            MeshRenderer mr = q.GetComponent<MeshRenderer>();
-            if (mr != null) mr.sharedMaterial = m;
-
-            q.AddComponent<SpriteBillboard>();
-        }
-
-        /// Pone un material URP en modo transparente: sin esto, el alfa del sprite se pinta negro.
-        /// En URP no alcanza con escribir los floats: hay que encender la keyword, si no el
-        /// shader se queda con la variante opaca y el alfa se pinta negro.
-        private static void Transparentar(Material m)
-        {
-            m.EnableKeyword("_SURFACE_TYPE_TRANSPARENT");
-            m.DisableKeyword("_ALPHATEST_ON");
-            if (m.HasProperty("_Surface")) m.SetFloat("_Surface", 1f);
-            if (m.HasProperty("_Blend")) m.SetFloat("_Blend", 2f);
-            if (m.HasProperty("_BlendOp")) m.SetFloat("_BlendOp", 0f);
-            if (m.HasProperty("_SrcBlend")) m.SetFloat("_SrcBlend", (float)UnityEngine.Rendering.BlendMode.SrcAlpha);
-            if (m.HasProperty("_DstBlend")) m.SetFloat("_DstBlend", (float)UnityEngine.Rendering.BlendMode.OneMinusSrcAlpha);
-            if (m.HasProperty("_ZWrite")) m.SetFloat("_ZWrite", 0f);
-            m.renderQueue = 3000;
-        }
-
         /// En el cuerpo 3D no se puede mezclar (se veria el relleno por detras): se recorta el alfa.
         private static void RecortarAlfa(Material m)
         {
@@ -768,6 +1104,11 @@ namespace SlugOut.World
 
         private static void ApplyColor(GameObject root, Color color)
         {
+            if (MaterialesPixar.EsModeloTexturizado(root))
+            {
+                Debug.LogWarning("[SlugArena] ApplyColor ignorado: el modelo ya trae textura");
+                return;
+            }
             Shader s = Shader.Find("Universal Render Pipeline/Lit");
             if (s == null) s = Shader.Find("Standard");
             Material m = new Material(s);

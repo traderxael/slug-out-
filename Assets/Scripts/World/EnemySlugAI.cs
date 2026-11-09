@@ -14,13 +14,13 @@ namespace SlugOut.World
     /// Patrones de estado tomados de iDesole/swarmed-worm (MIT). Deteccion por distancia, sin fisica.
     public class EnemySlugAI : MonoBehaviour
     {
-        private enum Estado { Acecho, Carga, Embestida, Recuperacion, AvisoSalto, Aire, Aterrizaje, AvisoEsquiva, Esquiva, EsquivaRecup }
+        private enum Estado { Acecho, AvisoMordida, AvisoDisparo, DisparoRecup, Carga, Embestida, Recuperacion, AvisoSalto, Aire, Aterrizaje, AvisoEsquiva, Esquiva, EsquivaRecup }
 
         [SerializeField] private Transform target;
         [SerializeField] private float speed = 3.2f;
         [SerializeField] private float attackRange = 1.8f;
         [SerializeField] private float attackCooldown = 1.4f;
-        [SerializeField] private float attackDamage = 8f;
+        [SerializeField] private float attackDamage = 7f;
         [SerializeField] private int killsRegistered = 0;
 
         [Header("Arquetipo")]
@@ -55,6 +55,34 @@ namespace SlugOut.World
         [SerializeField] private float zigzagAmplitud = 0.62f;
         [SerializeField] private float zigzagFrecuencia = 4.2f;
 
+        [Header("Mordida basica (los tres arquetipos)")]
+        // El mordisco era instantaneo: a rango de contacto no habia forma de leerlo y la rodada
+        // no servia contra el ataque mas comun. Ahora avisa con el mismo pulso naranja del
+        // embestidor y el golpe se resuelve al final; si el jugador salio del alcance, falla.
+        [SerializeField] private float mordidaAviso = 0.22f;
+        [Tooltip("Giro lento durante el aviso: permite esquivar de costado, no congelarse.")]
+        [SerializeField] private float giroAviso = 180f;
+        [SerializeField] private int mordidas = 0;
+        [SerializeField] private int mordidasAlAire = 0;
+
+        [Header("Separacion (para que no se apilen)")]
+        [Tooltip("Distancia a la que dos babosas se empujan. Sin esto cuatro perseguidores ocupan el mismo punto y tapan la pelea.")]
+        [SerializeField] private float separacionRadio = 1.2f;
+        [SerializeField] private float separacionFuerza = 0.65f;
+
+        [Header("Escupidor (a distancia)")]
+        [SerializeField] private float disparoAviso = 0.5f;
+        [SerializeField] private float disparoRecuperacion = 0.4f;
+        [SerializeField] private float disparoEnfriamiento = 2.2f;
+        [SerializeField] private float disparoRangoMin = 4.5f;
+        [SerializeField] private float disparoRangoMax = 13f;
+        [SerializeField] private float disparoRetroceso = 4.5f;
+        [SerializeField] private float disparoVelocidad = 18f;
+        [SerializeField] private float disparoDanoEscala = 1.15f;
+        [Tooltip("Fraccion de la velocidad del jugador que se adelanta al apuntar.")]
+        [SerializeField] private float disparoPlomo = 0.7f;
+        [SerializeField] private int disparos = 0;
+
         [Header("Esquiva telegrafiada (los tres arquetipos)")]
         // Ventana de aviso: corta a proposito, 200 ms, porque es lo que hace legible la mecanica
         // (el jugador ve el tell y aun asi puede corregir el apuntado).
@@ -71,12 +99,19 @@ namespace SlugOut.World
         [Tooltip("Cuanto sobresale el pivot del personaje sobre el piso.")]
         [SerializeField] private float alturaSuelo = 0f;
 
+        [Header("Colision")]
+        [Tooltip("La cobertura corta tiros Y frena cuerpos: el mismo barrido que usa el jugador.")]
+        [SerializeField] private float radioCuerpo = 0.5f;
+        [SerializeField] private float altoCuerpo = 2f;
+
         [Header("Estado (solo lectura)")]
         [SerializeField] private Estado estado = Estado.Acecho;
         [SerializeField] private float progresoAviso = 0f;
         [SerializeField] private int embestidas = 0;
         [SerializeField] private int saltos = 0;
         [SerializeField] private int aterrizajesConGolpe = 0;
+        [SerializeField] private int invocaciones = 0;     // tejedor: sífilos invocados
+        [SerializeField] private int entierros = 0;        // excavador: veces enterrado
         [SerializeField] private float alturaActual = 0f;
         [SerializeField] private int esquivas = 0;
         [SerializeField] private int esquivasCanceladas = 0;
@@ -86,6 +121,9 @@ namespace SlugOut.World
         private float _cdEmbestida;
         private float _cdSalto;
         private float _cdEsquiva;
+        private float _cdDisparo;
+        private float _cdTejedor;      // temporizador de invocación/soporte del tejedor
+        private float _cdExcavador;    // temporizador de enterrar/salir del excavador
         private Vector3 _rumboEsquiva;
         private float _fase;
         private Vector3 _rumbo;
@@ -116,15 +154,21 @@ namespace SlugOut.World
         public static int SemillaActual { get { return _semillaRun; } }
         public float Reloj { get { return _reloj; } }
 
-        public enum Arquetipo { Embestidor, Saltarin, Frenetico }
+        public enum Arquetipo { Embestidor, Saltarin, Frenetico, Escupidor, Volador, Tejedor, Excavador }
 
         /// 0 = sin aviso; crece a 1 durante el windup del embestidor, la agachada del saltarin o la
         /// ventanada de la esquiva. SlugAnimator lo lee para pintar el tell, asi que los tres
         /// arquetipos y la esquiva avisan igual: no hay un sistema de telegrafia paralelo.
         public float ProgresoAviso { get { return progresoAviso; } }
+        /// Contadores de la mordida: la que llega y la que el jugador esquivo saliendo del alcance.
+        public int Mordidas { get { return mordidas; } }
+        public int MordidasAlAire { get { return mordidasAlAire; } }
+        public bool Mordiendo { get { return estado == Estado.AvisoMordida; } }
+        public int Disparos { get { return disparos; } }
+        public bool Disparando { get { return estado == Estado.AvisoDisparo || estado == Estado.DisparoRecup; } }
         /// Queda al descubierto despues de embestir, de aterrizar y de esquivar: el castigo de su
         /// propia mecanica, para que esquivar no sea gratis.
-        public bool EstaExpuesto { get { return estado == Estado.Recuperacion || estado == Estado.Aterrizaje || estado == Estado.EsquivaRecup; } }
+        public bool EstaExpuesto { get { return estado == Estado.Recuperacion || estado == Estado.Aterrizaje || estado == Estado.EsquivaRecup || estado == Estado.DisparoRecup; } }
         public Arquetipo ArquetipoActual { get { return arquetipo; } }
         public int Embestidas { get { return embestidas; } }
         public int Saltos { get { return saltos; } }
@@ -142,20 +186,39 @@ namespace SlugOut.World
         /// tocar los 22 .asset para repartir roles.
         public static Arquetipo ArquetipoDe(SlugData d)
         {
+            return ArquetipoDe(d, d != null ? d.rolEnemigo : SlugData.RolEnemigo.Normal);
+        }
+
+        /// Igual, pero con el rol ya decidido: lo fija el asset o lo reparte la campana
+        /// (ver SlugArenaGame.RolDeCampana). El rol siempre manda sobre los stats.
+        public static Arquetipo ArquetipoDe(SlugData d, SlugData.RolEnemigo rol)
+        {
+            if (rol == SlugData.RolEnemigo.Volador) return Arquetipo.Volador;
+            if (rol == SlugData.RolEnemigo.Tejedor) return Arquetipo.Tejedor;
+            if (rol == SlugData.RolEnemigo.Excavador) return Arquetipo.Excavador;
             if (d == null) return Arquetipo.Frenetico;
             if (d.clashPower >= 60f) return Arquetipo.Embestidor;
             if (d.clashPower < 45f && d.accelerationRate >= 90f) return Arquetipo.Saltarin;
+            // Cuarto rol: el unico stat que nadie usaba. Va despues de los otros dos para no
+            // robarles sus siluetas; con el roster actual quedan 30/5/6/23.
+            if (d.launchSpeedMph >= 55f) return Arquetipo.Escupidor;
             return Arquetipo.Frenetico;
         }
 
         public void SetTarget(Transform t) { target = t; }
         public void SetSpeed(float s) { speed = s; }
+        public float GetSpeed() { return speed; }
         public void SetDamage(float d) { attackDamage = d; }
+        public float GetDamage() { return attackDamage; }
         public void SetArquetipo(Arquetipo a)
         {
             arquetipo = a;
             if (a == Arquetipo.Saltarin) { speed *= 1.25f; attackCooldown *= 0.8f; }
             else if (a == Arquetipo.Frenetico) { attackCooldown *= 0.6f; attackDamage *= 0.7f; }
+            else if (a == Arquetipo.Escupidor) { speed *= 0.9f; attackCooldown *= 1.2f; attackDamage *= 1.1f; }
+            else if (a == Arquetipo.Volador) { speed *= 1.1f; attackCooldown *= 1.1f; }
+            else if (a == Arquetipo.Tejedor) { speed *= 0.85f; attackCooldown *= 1.4f; attackDamage *= 0.8f; }
+            else if (a == Arquetipo.Excavador) { speed *= 0.75f; attackCooldown *= 1.6f; attackDamage *= 1.2f; }
         }
 
         /// Resolucion PEREZOSA: en SpawnEnemy el animator se agrega DESPUES de este
@@ -188,12 +251,15 @@ namespace SlugOut.World
             if (target != null) _foe = target.GetComponent<SlugActor>();
             _cd = attackCooldown * 0.6f;
             _cdEmbestida = 1.2f;
+            _cdTejedor = 8f;
+            _cdExcavador = 6f;
             // el primer salto cae durante la aproximacion (llega a los ~3u), no despues de
             // plantarse en tu cara; cada saltarin despegua en un momento distinto, pero el MISMO
             // momento distinto si el run tiene la misma semilla
             System.Random rng = new System.Random(_semillaRun + ++_nacimientos * 7919);
             _cdSalto = 0.6f + (float)rng.NextDouble() * 0.9f;
             _fase = (float)rng.NextDouble() * 6.2831855f;
+            _cdDisparo = 1.0f + (float)rng.NextDouble() * 0.8f;
             _yBase = Terrain3D.Altura(transform.position.x, transform.position.z) + alturaSuelo;
         }
 
@@ -227,10 +293,28 @@ namespace SlugOut.World
                 return;
             }
 
+            // La mordida avisada manda sobre el arquetipo: mientras corre el aviso el bicho no
+            // cambia de idea ni salta, y el golpe se decide al final del aviso.
+            if (estado == Estado.AvisoMordida)
+            {
+                PeleaMordida(Time.deltaTime);
+                return;
+            }
+
+            if (estado == Estado.AvisoDisparo || estado == Estado.DisparoRecup)
+            {
+                PeleaEscupidor(Time.deltaTime);
+                return;
+            }
+
             switch (arquetipo)
             {
                 case Arquetipo.Saltarin: PeleaSaltarin(dist, delta); return;
                 case Arquetipo.Frenetico: progresoAviso = 0f; PeleaBasica(dist, delta); return;
+                case Arquetipo.Escupidor: PeleaEscupidor(Time.deltaTime); return;
+                case Arquetipo.Volador: PeleaVolador(dist, delta); return;
+                case Arquetipo.Tejedor: PeleaTejedor(Time.deltaTime); return;
+                case Arquetipo.Excavador: PeleaExcavador(dist, delta, Time.deltaTime); return;
             }
 
             _cdEmbestida -= Time.deltaTime;
@@ -246,16 +330,17 @@ namespace SlugOut.World
                     }
                     // el aviso tiene prioridad sobre el mordisco: si no, el enemigo entra a rango de
                     // contacto, muerde cada 0.84s y el windup no llega a arrancar nunca
-                    if (_cdEmbestida <= 0f && dist > distanciaMinimaEmbestida) { EmpezarCarga(delta); return; }
+                    if (_cdEmbestida <= 0f && dist > distanciaMinimaEmbestida && TengoLinea()) { EmpezarCarga(delta); return; }
+                    Separar(Time.deltaTime);
                     _cd -= Time.deltaTime;
-                    if (_cd <= 0f) { _cd = attackCooldown; Golpear(1f); }
+                    if (_cd <= 0f && TengoLinea()) EmpezarMordida();
                     return;
 
                 case Estado.Carga:
                     _t += Time.deltaTime;
                     float k = Mathf.Clamp01(_t / cargaDuracion);
                     progresoAviso = k;
-                    if (k < cargaAtrasRatio) transform.position -= _rumbo * speed * cargaAtrasVelocidad * Time.deltaTime;
+                    if (k < cargaAtrasRatio) MoverConColision(-_rumbo * speed * cargaAtrasVelocidad * Time.deltaTime);
                     if (k >= 1f)
                     {
                         estado = Estado.Embestida; _t = 0f; embestidas++;
@@ -268,7 +353,7 @@ namespace SlugOut.World
                     _t += Time.deltaTime;
                     float e = Mathf.Clamp01(_t / embestidaDuracion);
                     float acelera = Mathf.Clamp01(_t / embestidaAceleracion);
-                    transform.position += _rumbo * speed * embestidaMultiplicador * acelera * Time.deltaTime;
+                    MoverConColision(_rumbo * speed * embestidaMultiplicador * acelera * Time.deltaTime);
                     GolpearEnContacto(1.5f);
                     if (_t >= embestidaDuracion)
                     {
@@ -303,6 +388,46 @@ namespace SlugOut.World
             if (pasoLateral < margen) return false;                     // lento: no saca el cuerpo
             if (distancia < margen) return false;                       // ya encima: avisar regala el tell
             return distancia <= velocidadTiro * tiempoVentana + margen; // alcanza a tiempo
+        }
+
+        /// Empuje horizontal para que dos perseguidores no ocupen el mismo punto. Es una regla
+        /// pura y determinista (sin Random ni fisica): cuando dos cuerpos coinciden exactamente,
+        /// el lado lo decide el nombre, asi uno empuja a +X y el otro a -X en el mismo cuadro.
+        public static Vector3 Separacion(Vector3 propio,
+            System.Collections.Generic.IReadOnlyList<SlugActor> actores,
+            SlugActor yo, float radio)
+        {
+            Vector3 empuje = Vector3.zero;
+            if (actores == null || radio <= 0.0001f) return empuje;
+
+            // El orden de la lista es el orden de nacimiento (OnEnable): sirve de desempate
+            // estable cuando dos cuerpos coinciden exactamente.
+            int indiceYo = -1;
+            for (int i = 0, n = actores.Count; i < n; i++)
+                if (actores[i] == yo) { indiceYo = i; break; }
+
+            for (int i = 0, n = actores.Count; i < n; i++)
+            {
+                SlugActor a = actores[i];
+                if (a == null || a == yo || a.IsPlayer || !a.Alive || a.Capturada) continue;
+                Vector3 d = propio - a.transform.position;
+                d.y = 0f;
+                float sq = d.sqrMagnitude;
+                if (sq >= radio * radio) continue;
+
+                if (sq < 0.0001f)
+                {
+                    // Dos bichos en el mismo punto: el que nacio antes empuja a +X y el otro a
+                    // -X. Sin esto los dos elegirian el mismo lado y seguirian pegados.
+                    float signo = indiceYo >= 0 && indiceYo > i ? -1f : 1f;
+                    empuje += new Vector3(signo, 0f, 0f);
+                    continue;
+                }
+
+                float dist = Mathf.Sqrt(sq);
+                empuje += d / dist * (1f - dist / radio);
+            }
+            return empuje;
         }
 
         /// Esquiva solo si (a) el corredor del tiro le barre el cuerpo, (b) el paso lateral que le
@@ -367,8 +492,7 @@ namespace SlugOut.World
             if (estado == Estado.Esquiva)
             {
                 progresoAviso = 1f;             // agachado: el aviso queda pleno mientras se mueve
-                transform.position += _rumboEsquiva * (speed * pasoVelocidadRatio * dt);
-                ApoyarEnPiso();
+                MoverConColision(_rumboEsquiva * (speed * pasoVelocidadRatio * dt));
                 if (_t >= pasoDuracion)
                 {
                     esquivas++;
@@ -384,6 +508,226 @@ namespace SlugOut.World
                 estado = Estado.Acecho;
                 _t = 0f;
                 _cdEsquiva = enfriamientoEsquiva;
+            }
+        }
+
+        /// Maquina del Escupidor. Aviso y recuperacion se gatean por dt para poder integrarlas
+        /// en EditMode; el movimiento tambien usa dt, no Time.deltaTime.
+        public void PeleaEscupidor(float dt)
+        {
+            if (target == null) return;
+            Vector3 delta = target.position - transform.position; delta.y = 0f;
+            float dist = delta.magnitude;
+
+            if (estado == Estado.AvisoDisparo)
+            {
+                _t += dt;
+                progresoAviso = Mathf.Clamp01(_t / Mathf.Max(0.0001f, disparoAviso));
+                MirarHacia(delta, 120f, dt);
+                if (_t < disparoAviso) return;
+                progresoAviso = 0f;
+                if (TengoLinea())
+                {
+                    DispararAlJugador();
+                    estado = Estado.DisparoRecup;
+                    _t = 0f;
+                }
+                else
+                {
+                    // Perdio la linea durante el aviso: la cobertura gana esta ronda.
+                    estado = Estado.Acecho;
+                    _t = 0f;
+                    _cdDisparo = 0.4f;
+                }
+                return;
+            }
+
+            if (estado == Estado.DisparoRecup)
+            {
+                _t += dt;
+                if (_t >= disparoRecuperacion)
+                {
+                    estado = Estado.Acecho;
+                    _t = 0f;
+                    _cdDisparo = disparoEnfriamiento;
+                }
+                return;
+            }
+
+            if (estado == Estado.AvisoMordida) { PeleaMordida(dt); return; }
+
+            _cdDisparo -= dt;
+            _cd -= dt;
+            MirarHacia(delta, 360f, dt);
+
+            if (dist < disparoRetroceso)
+            {
+                if (dist > 0.001f)
+                {
+                    bool retrocedio = AvanzarUtil(-delta / dist, speed * 0.9f, dt);
+                    if (retrocedio) return;
+                    Vector3 d = target.position - transform.position;
+                    d.y = 0f;
+                    dist = d.magnitude;
+                }
+                // Acorralado dentro del alcance: la retirada no lo salva y muerde flojo.
+                if (dist <= attackRange && _cd <= 0f && TengoLinea())
+                {
+                    EmpezarMordida();
+                    return;
+                }
+                if (dist > 0.001f) Avanzar(-(target.position - transform.position) / dist, speed * 0.7f, dt);
+                return;
+            }
+            if (dist > disparoRangoMax)
+            {
+                Avanzar(delta / dist, speed * 0.9f, dt);
+                return;
+            }
+
+            // En rango: orbita de costado (determinista) y dispara si hay linea.
+            Vector3 perp = Vector3.Cross(Vector3.up, delta / Mathf.Max(dist, 0.001f));
+            float lado = Mathf.Sin(_reloj * 1.7f + _fase) >= 0f ? 1f : -1f;
+            Avanzar(perp * lado, speed * 0.45f, dt);
+            if (_cdDisparo <= 0f && dist >= disparoRangoMin && dist <= disparoRangoMax && TengoLinea())
+                EmpezarAvisoDisparo(delta);
+        }
+
+        private void EmpezarAvisoDisparo(Vector3 delta)
+        {
+            estado = Estado.AvisoDisparo;
+            _t = 0f;
+            progresoAviso = 0f;
+            delta.y = 0f;
+            if (delta.sqrMagnitude > 0.0001f)
+                transform.rotation = Quaternion.LookRotation(delta.normalized, Vector3.up);
+            DuelistaAnimator.NotificarAtaque(gameObject);
+            // Ensenanza del counterplay en el primer aviso que ve el jugador.
+            SlugActor objetivo = target != null ? target.GetComponent<SlugActor>() : null;
+            if (objetivo != null && objetivo.IsPlayer) GameHUD.MostrarAvisoEscupidor();
+        }
+
+        private void DispararAlJugador()
+        {
+            if (target == null) return;
+            Vector3 origen = transform.position + Vector3.up * 0.8f;
+            Vector3 destino = target.position + Vector3.up * 0.8f;
+            PlayerController pc = target.GetComponent<PlayerController>();
+            Vector3 vel = Vector3.zero;
+            if (pc != null)
+            {
+                Vector3 m = pc.MoveInput; m.y = 0f;
+                if (m.sqrMagnitude > 0.0001f) vel = m.normalized * pc.Velocidad;
+            }
+            float dist = Vector3.Distance(origen, destino);
+            float tiempo = dist / Mathf.Max(0.01f, disparoVelocidad);
+            destino += vel * (tiempo * disparoPlomo);
+            Vector3 dir = destino - origen;
+            if (dir.sqrMagnitude < 0.0001f) return;
+
+            ElementType e = _self != null ? _self.Element : ElementType.Earth;
+            Color color = _self != null && _self.Data != null ? _self.Data.elementColor : Color.yellow;
+            SlugShot.Lanzar(origen, dir, e, attackDamage * disparoDanoEscala, false,
+                disparoVelocidad, color, 0.34f);
+            SlugAnimator anim = Anim();
+            if (anim != null) anim.PlayShot();
+            disparos++;
+            Debug.Log("[EnemySlugAI] " + name + ": escupitajo #" + disparos
+                + " dist=" + dist.ToString("F1") + "m");
+        }
+
+        private bool TengoLinea()
+        {
+            if (target == null) return false;
+            return SlugShot.LineaDespejada(transform.position + Vector3.up * 0.8f,
+                target.position + Vector3.up * 0.8f);
+        }
+
+        private void MirarHacia(Vector3 dir, float gradosPorSegundo, float dt)
+        {
+            dir.y = 0f;
+            if (dir.sqrMagnitude < 0.0001f) return;
+            transform.rotation = Quaternion.RotateTowards(transform.rotation,
+                Quaternion.LookRotation(dir.normalized, Vector3.up), gradosPorSegundo * dt);
+        }
+
+        private void Avanzar(Vector3 dir, float s, float dt)
+        {
+            Vector3 sep = Separacion(transform.position, SlugActor.Vivos, Self(), separacionRadio) * separacionFuerza;
+            dir += sep;
+            if (dir.sqrMagnitude > 0.0001f) dir.Normalize();
+            MoverConColision(dir * s * dt);
+        }
+
+        /// Igual que Avanzar pero devuelve si el cuerpo avanzo de verdad. La retirada del
+        /// Escupidor necesita distinguir una cobertura que lo frena de un deslizamiento util.
+        private bool AvanzarUtil(Vector3 dir, float s, float dt)
+        {
+            dir.y = 0f;
+            if (dir.sqrMagnitude < 0.0001f) { ApoyarEnPiso(); return false; }
+            dir.Normalize();
+            Vector3 sep = Separacion(transform.position, SlugActor.Vivos, Self(), separacionRadio) * separacionFuerza;
+            Vector3 final = dir + sep;
+            if (final.sqrMagnitude < 0.0001f) final = dir;
+            else final.Normalize();
+
+            Vector3 antes = transform.position;
+            float pedido = s * dt;
+            MoverConColision(final * pedido);
+            Vector3 real = transform.position - antes;
+            real.y = 0f;
+            return Vector3.Dot(real, dir) >= pedido * 0.1f;
+        }
+
+        /// Arranca el aviso de mordida. Publico porque las pruebas EditMode integran el aviso
+        /// con PeleaMordida(dt), igual que la esquiva; Update lo llama desde Acecho y PeleaBasica.
+        public void EmpezarMordida()
+        {
+            if (estado == Estado.AvisoMordida) return;
+            estado = Estado.AvisoMordida;
+            _t = 0f;
+            progresoAviso = 0f;
+            // El enfriamiento corre desde el aviso: el aviso no es tiempo regalado de recarga.
+            _cd = attackCooldown;
+        }
+
+        /// El golpe se resuelve al FINAL del aviso. Si el jugador salio del alcance, la mordida
+        /// falla y se cuenta: con la rodada (3,6 m) o caminando de costado ahora hay contrarrespuesta
+        /// contra el ataque cuerpo a cuerpo, no solo contra los tiros.
+        public void PeleaMordida(float dt)
+        {
+            if (estado != Estado.AvisoMordida) return;   // idempotente para las pruebas y para Update
+            _t += dt;
+            progresoAviso = Mathf.Clamp01(_t / Mathf.Max(0.0001f, mordidaAviso));
+
+            // Sigue girando lento hacia el objetivo: quedarse quieto no alcanza, hay que moverse.
+            if (target != null)
+            {
+                Vector3 d = target.position - transform.position;
+                d.y = 0f;
+                if (d.sqrMagnitude > 0.0001f)
+                    transform.rotation = Quaternion.RotateTowards(transform.rotation,
+                        Quaternion.LookRotation(d.normalized, Vector3.up), giroAviso * dt);
+            }
+
+            if (_t < mordidaAviso) return;
+
+            progresoAviso = 0f;
+            estado = Estado.Acecho;
+            if (target == null) return;
+            Vector3 dif = target.position - transform.position;
+            dif.y = 0f;
+            if (dif.sqrMagnitude <= attackRange * attackRange)
+            {
+                mordidas++;
+                // El Escupidor muerde flojo: su amenaza es el proyectil; acorralarlo no debe
+                // castigar como un cuerpo a cuerpo completo.
+                Golpear(arquetipo == Arquetipo.Escupidor ? 0.6f : 1f);
+            }
+            else
+            {
+                mordidasAlAire++;
+                Debug.Log("[EnemySlugAI] " + name + ": mordida al aire (el objetivo salio del alcance)");
             }
         }
 
@@ -405,9 +749,54 @@ namespace SlugOut.World
 
         private void Mover(Vector3 dir, float s)
         {
-            transform.position += dir * s * Time.deltaTime;
-            transform.rotation = Quaternion.Slerp(transform.rotation, Quaternion.LookRotation(dir, Vector3.up), 6f * Time.deltaTime);
+            // La separacion se suma a la direccion de avance: no frena la persecucion, la abre
+            // en abanico cuando dos bichos eligen el mismo camino.
+            dir += Separacion(transform.position, SlugActor.Vivos, Self(), separacionRadio) * separacionFuerza;
+            if (dir.sqrMagnitude > 0.0001f)
+            {
+                dir.Normalize();
+                transform.rotation = Quaternion.Slerp(transform.rotation,
+                    Quaternion.LookRotation(dir, Vector3.up), 6f * Time.deltaTime);
+            }
+            MoverConColision(dir * s * Time.deltaTime);
+        }
+
+        /// Mueve en horizontal con el mismo barrido del jugador. Sin esto la cobertura corta
+        /// los tiros pero el embestidor la atraviesa, y el pilar deja de leerse como solido.
+        private void MoverConColision(Vector3 delta)
+        {
+            delta.y = 0f;
+            Vector3 centro = transform.position + Vector3.up * (altoCuerpo * 0.5f);
+            if (ColisionJugador.SobreMuro(centro, radioCuerpo, altoCuerpo))
+            {
+                // Nacido o aterrizado dentro de un proxy: el barrido no resuelve solape inicial.
+                Vector3 libre = ColisionJugador.PuntoLibre(centro, Vector3.zero,
+                    radioCuerpo, altoCuerpo);
+                transform.position = new Vector3(libre.x, transform.position.y, libre.z);
+                Physics.SyncTransforms();
+                centro = transform.position + Vector3.up * (altoCuerpo * 0.5f);
+            }
+            if (delta.sqrMagnitude < 0.0000001f) { ApoyarEnPiso(); return; }
+            Vector3 fin = ColisionJugador.Deslizar(centro, delta, radioCuerpo, altoCuerpo,
+                out _, out _);
+            transform.position = new Vector3(fin.x, transform.position.y, fin.z);
             ApoyarEnPiso();
+        }
+
+        /// Resolucion perezosa, como Anim(): el SlugActor puede agregarse antes o despues.
+        private SlugActor Self()
+        {
+            if (_self == null) _self = GetComponent<SlugActor>();
+            return _self;
+        }
+
+        /// Empuje suave cuando el bicho ya esta en rango y no camina: sin esto los cuatro se
+        /// quedan plantados uno encima del otro alrededor del jugador.
+        private void Separar(float dt)
+        {
+            Vector3 sep = Separacion(transform.position, SlugActor.Vivos, Self(), separacionRadio);
+            if (sep.sqrMagnitude <= 0.0001f) return;
+            MoverConColision(sep.normalized * speed * separacionFuerza * 0.5f * dt);
         }
 
         /// Mismo terreno que pisa el jugador: la altura sale de la misma funcion estatica.
@@ -453,7 +842,11 @@ namespace SlugOut.World
 
                 default:
                     progresoAviso = 0f;
-                    if (_cdSalto <= 0f && dist > saltoDistanciaMinima && dist < saltoRango)
+                    // Tampoco salta a traves de una cobertura: el arco mide 1,7 m y un pilar
+                    // de 2,8 m lo corta, asi que el salto se cancelaria en el aire sin leerse.
+                    if (_cdSalto <= 0f && dist > saltoDistanciaMinima && dist < saltoRango
+                        && SlugShot.LineaDespejada(transform.position + Vector3.up,
+                            target.position + Vector3.up))
                     {
                         estado = Estado.AvisoSalto;
                         _t = 0f;
@@ -491,17 +884,124 @@ namespace SlugOut.World
             _cdSalto = saltoEnfriamiento;
             alturaActual = 0f;
             _yDestino = Terrain3D.Altura(transform.position.x, transform.position.z) + alturaSuelo;
-            transform.position = new Vector3(transform.position.x, _yDestino, transform.position.z);
+            // Si el arco cae dentro de un pilar, el cuerpo sale antes de resolver el golpe.
+            Vector3 libre = ColisionJugador.PuntoLibre(
+                new Vector3(transform.position.x, _yDestino + 1f, transform.position.z),
+                Vector3.zero, radioCuerpo, altoCuerpo);
+            _yDestino = Terrain3D.Altura(libre.x, libre.z) + alturaSuelo;
+            transform.position = new Vector3(libre.x, _yDestino, libre.z);
             _yBase = _yDestino;
 
-            Vector3 p = target.position;
+            SlugActor victima = target != null ? target.GetComponent<SlugActor>() : null;
+            float hpAntes = victima != null ? victima.Hp : 0f;
+            Vector3 p = target != null ? target.position : transform.position;
             p.y = _yBase;
-            if ((p - _destino).sqrMagnitude <= saltoRadio * saltoRadio)
+            Vector3 pos = transform.position; pos.y = _yBase;
+            bool enRadio = target != null && (p - pos).sqrMagnitude <= saltoRadio * saltoRadio;
+            if (enRadio) Golpear(saltoMultiplicador);
+            if (enRadio && victima != null && victima.Hp < hpAntes) aterrizajesConGolpe++;
+            GameFeel.AddTrauma(enRadio && victima != null && victima.Hp < hpAntes ? 0.34f : 0.12f);
+        }
+
+        /// Volador: vuela sobre obstáculos (ignora cobertura al moverse) y solo recibe daño
+        /// con tiro a 100 MPH (fase >= 1). Su contra juego es cargar el disparo.
+        private void PeleaVolador(float dist, Vector3 delta)
+        {
+            if (dist > attackRange)
             {
-                aterrizajesConGolpe++;
-                Golpear(saltoMultiplicador);
+                Vector3 dir = dist > 0.001f ? delta / dist : Vector3.forward;
+                // Vuela en línea recta sin respetar cobertura: el pilar no lo detiene.
+                transform.position += dir * speed * Time.deltaTime;
+                transform.rotation = Quaternion.Slerp(transform.rotation,
+                    Quaternion.LookRotation(dir, Vector3.up), 6f * Time.deltaTime);
+                ApoyarEnPiso();
+                return;
             }
-            GameFeel.AddTrauma((p - _destino).sqrMagnitude <= saltoRadio * saltoRadio ? 0.34f : 0.12f);
+            Separar(Time.deltaTime);
+            _cd -= Time.deltaTime;
+            if (_cd <= 0f && TengoLinea()) EmpezarMordida();
+        }
+
+        /// Tejedor / soporte: no ataca al jugador directamente. Cada ~8 s invoca un sífilo
+        /// (enemigo de 1 HP) o aplica un modificador de velocidad a los aliados cercanos.
+        private void PeleaTejedor(float dt)
+        {
+            _cdTejedor -= dt;
+            if (_cdTejedor <= 0f)
+            {
+                _cdTejedor = 8f;
+                InvocarSifilo();
+            }
+            // Se mantiene a distancia media del jugador, sin morder.
+            if (target != null)
+            {
+                Vector3 d = target.position - transform.position;
+                d.y = 0f;
+                float dist = d.magnitude;
+                if (dist < 6f)
+                {
+                    // Se retira un poco: es soporte, no cuerpo a cuerpo.
+                    Vector3 lejos = -d / Mathf.Max(dist, 0.001f);
+                    MoverConColision(lejos * speed * 0.6f * dt);
+                }
+                else if (dist > 10f)
+                {
+                    MoverConColision(d / Mathf.Max(dist, 0.001f) * speed * 0.6f * dt);
+                }
+                transform.rotation = Quaternion.Slerp(transform.rotation,
+                    Quaternion.LookRotation(target.position - transform.position, Vector3.up), 4f * dt);
+            }
+        }
+
+        /// Excavador: entierra (invulnerable, invisible, no avanza), luego sale, ataca y vuelve a enterrarse.
+        private void PeleaExcavador(float dist, Vector3 delta, float dt)
+        {
+            var self = Self();
+            if (self != null && self.EstaEnterrado)
+            {
+                _cdExcavador -= dt;
+                if (_cdExcavador <= 0f)
+                {
+                    self.SetEnterrado(false);
+                    _cdExcavador = 5f;
+                    entierros++;
+                    Debug.Log("[EnemySlugAI] " + name + " sale de la tierra");
+                }
+                return; // enterrado: no se mueve ni ataca
+            }
+
+            _cdExcavador -= dt;
+            if (_cdExcavador <= 0f && target != null)
+            {
+                // Entierra: invulnerable por ~6 s.
+                var actor = Self();
+                if (actor != null) actor.SetEnterrado(true);
+                _cdExcavador = 6f;
+                entierros++;
+                Debug.Log("[EnemySlugAI] " + name + " se entierra");
+                return;
+            }
+
+            if (target != null && dist > attackRange)
+            {
+                Vector3 dir = dist > 0.001f ? delta / dist : Vector3.forward;
+                MoverConColision(dir * speed * Time.deltaTime);
+                return;
+            }
+            Separar(Time.deltaTime);
+            _cd -= Time.deltaTime;
+            if (_cd <= 0f && TengoLinea()) EmpezarMordida();
+        }
+
+        /// Invoca un sífilo: enemigo diminuto de 1 HP que muere con un tiro, pero suma presión.
+        private void InvocarSifilo()
+        {
+            if (target == null) return;
+            var arena = Object.FindFirstObjectByType<SlugArenaGame>();
+            if (arena == null) return;
+            arena.SpawnSifilo(transform.position + transform.forward * 2f, target);
+            invocaciones++;
+            Debug.Log("[EnemySlugAI] " + name + " invocó sífilo #" + invocaciones);
         }
 
         private void PeleaBasica(float dist, Vector3 delta)
@@ -520,8 +1020,10 @@ namespace SlugOut.World
                 Mover(dir, speed);
                 return;
             }
+            // Al plantarse a morder los cuerpos se empujan apenas, para no quedar uno dentro del otro.
+            Separar(Time.deltaTime);
             _cd -= Time.deltaTime;
-            if (_cd <= 0f) { _cd = attackCooldown; Golpear(1f); }
+            if (_cd <= 0f && TengoLinea()) EmpezarMordida();
         }
 
         private void GolpearEnContacto(float multiplicador)
@@ -535,7 +1037,12 @@ namespace SlugOut.World
 
         private void Golpear(float multiplicador)
         {
+            // Resolucion perezosa: en las pruebas EditMode Start no corre y _foe quedaria null
+            // aunque el target si tenga SlugActor. Mismo motivo que Anim().
+            if (_foe == null && target != null) _foe = target.GetComponent<SlugActor>();
             if (_foe == null || !_foe.Alive) return;
+            // Una esquina de piedra tapa tanto como una pared: el golpe no atraviesa cobertura.
+            if (!TengoLinea()) return;
             SlugAnimator animMordida = Anim();
             if (animMordida != null) animMordida.PlayShot();   // mordisco: mismo estiron que el disparo
             ElementType e = _self != null ? _self.Element : ElementType.Earth;

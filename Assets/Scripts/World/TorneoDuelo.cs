@@ -38,10 +38,19 @@ namespace SlugOut.World
     public class Duelo
     {
         public const float VidaBase = 62f;
+        /// Cuantos turnos tardan en volver a habilitarse las habilidades dentro del duelo. unica
+        /// fuente: el panel del torneo lee este numero en vez de repetirlo a mano, asi el cartel
+        /// no puede quedar mentiroso si algun dia depende de la babosa.
+        public const int EnfriamientoHabilidad = 2;
 
         public readonly List<Combatiente> jugador = new List<Combatiente>();
         public readonly List<Combatiente> rival = new List<Combatiente>();
         public readonly List<string> registro = new List<string>();
+
+        /// Las acciones que pidio el lado del jugador, en orden. No se usa para jugar: es el
+        /// historial que un checkpoint tendria que mandar para que el otro lado reconstruya el
+        /// mismo duelo (ver `DueloCheckpoint`). Se limpia en `Cargar`, como el resto del estado.
+        public readonly List<Jugada> jugadas = new List<Jugada>();
 
         public int activoJugador;
         public int activoRival;
@@ -50,14 +59,30 @@ namespace SlugOut.World
         public bool Terminado { get; private set; }
         public bool GanoJugador { get; private set; }
 
+        /// Semilla con la que se armo ESTE duelo. La IA del rival decide con esta y no con
+        /// `UnityEngine.Random`: con el RNG global, dos torneos con la misma semilla daban
+        /// resultados distintos, o sea que el torneo no se podía reproducir ni verificar jugada por
+        /// jugada — que es justamente lo que hace falta antes de pensar en un rival remoto.
+        public int Semilla { get; private set; }
+        private System.Random _rng;
+
+        /// Cuanto se le infló la vida al rival en ESTE duelo. Se guarda (y no se deduce de `hpMax`)
+        /// para que un checkpoint pueda reconstruir el mismo duelo sin adivinar la escala.
+        public float EscalaRival { get; private set; }
+
         public Combatiente ActivoJ { get { return jugador[activoJugador]; } }
         public Combatiente ActivoR { get { return rival[activoRival]; } }
 
-        public void Cargar(SlugData[] equipoJugador, SlugData[] equipoRival, float escalaRival = 1f)
+        public void Cargar(SlugData[] equipoJugador, SlugData[] equipoRival, float escalaRival = 1f,
+                           int semilla = 0)
         {
+            Semilla = semilla;
+            EscalaRival = escalaRival;
+            _rng = new System.Random(semilla);
             jugador.Clear();
             rival.Clear();
             registro.Clear();
+            jugadas.Clear();
             turno = 0;
             activoJugador = 0;
             activoRival = 0;
@@ -94,7 +119,7 @@ namespace SlugOut.World
             return equipo[0].Nombre + ", " + equipo[1].Nombre + " y " + equipo[2].Nombre;
         }
 
-        private static string NombreEfecto(SlugAbilityType tipo)
+        public static string NombreEfecto(SlugAbilityType tipo)
         {
             switch (tipo)
             {
@@ -117,12 +142,54 @@ namespace SlugOut.World
 
         // ------------------------------------------------------------------ turno del jugador
 
+        /// Decide si una accion es legal en el estado actual, sin resolverla. La UI ya deshabilita
+        /// los botones con estas mismas condiciones; aca sirven el mismo control para un origen que
+        /// NO esta en esta maquina: un cliente remoto puede mandar lo que sea, y el host
+        /// necesita una unica funcion donde apoyarse para rechazarlo. `TurnoJugador` sigue siendo
+        /// tolerante (es lo que la UI verificada espera), asi que quien valide por red llama a esta
+        /// primero y solo despues resuelve.
+        public bool AccionLegal(AccionDuelo accion, int indiceCambio, out string motivo)
+        {
+            if (Terminado) { motivo = "el duelo ya termino"; return false; }
+            if (!ActivoJ.Vivo) { motivo = "tu babosa activa no esta en combate"; return false; }
+            switch (accion)
+            {
+                case AccionDuelo.Habilidad:
+                    if (ActivoJ.enfriamiento > 0)
+                    {
+                        motivo = "la habilidad espera " + ActivoJ.enfriamiento + " turno/s mas";
+                        return false;
+                    }
+                    break;
+                case AccionDuelo.Cambiar:
+                    if (indiceCambio < 0 || indiceCambio >= jugador.Count)
+                    {
+                        motivo = "el indice de cambio " + indiceCambio + " no existe";
+                        return false;
+                    }
+                    if (indiceCambio == activoJugador)
+                    {
+                        motivo = "esa babosa ya esta en combate";
+                        return false;
+                    }
+                    if (!jugador[indiceCambio].Vivo)
+                    {
+                        motivo = "esa babosa no esta viva";
+                        return false;
+                    }
+                    break;
+            }
+            motivo = null;
+            return true;
+        }
+
         /// Resuelve la accion del jugador y despues la respuesta de la IA. Devuelve las lineas
         /// nuevas para que la UI muestre exactamente lo que paso en este turno.
         public List<string> TurnoJugador(AccionDuelo accion, int indiceCambio = -1)
         {
             var salida = new List<string>();
             if (Terminado) return salida;
+            jugadas.Add(new Jugada(accion, indiceCambio));
             int antes = registro.Count;
             turno++;
 
@@ -241,7 +308,7 @@ namespace SlugOut.World
                 usoHabilidad = true;
             }
             else if (el.enfriamiento == 0 && el.datos != null &&
-                     el.datos.abilityType != SlugAbilityType.Heal && Random.value < 0.45f)
+                     el.datos.abilityType != SlugAbilityType.Heal && _rng.NextDouble() < 0.45)
             {
                 Habilidad(el, ActivoJ, "El rival");
                 usoHabilidad = true;
@@ -271,7 +338,7 @@ namespace SlugOut.World
                 return;
             }
 
-            usuario.enfriamiento = 2;
+            usuario.enfriamiento = EnfriamientoHabilidad;
             Anotar(lado + " " + usuario.Nombre + " usa su habilidad: " + NombreEfecto(d.abilityType) + ".");
 
             switch (d.abilityType)
@@ -396,7 +463,9 @@ namespace SlugOut.World
             SlugData[] rivales = EquipoRival(_semilla + Ronda * 977, Ronda);
             float escala = 0.85f + Ronda * 0.22f;
             DueloActual = new Duelo();
-            DueloActual.Cargar(_equipo, rivales, escala);
+            // La misma semilla que eligio los rivales gobierna las decisiones de la IA: con eso,
+            // "torneo con semilla 48831" significa una secuencia concreta de jugadas, repetible.
+            DueloActual.Cargar(_equipo, rivales, escala, _semilla + Ronda * 31);
         }
 
         /// Siguiente ronda si se gano, o cierre del torneo si se perdio.
@@ -456,8 +525,19 @@ namespace SlugOut.World
 
         public static SlugData[] EquipoJugador(SlugData[] roster)
         {
+            return EquipoJugador(roster, GameFlow.Equipo(), GameFlow.BabosaElegida());
+        }
+
+        /// Version pura de la regla: el torneo juega con el equipo de 3 que el jugador armo en
+        /// la coleccion, y solo completa los huecos con el roster. Separarla del estado vivo
+        /// existe para que esa invariante (el vinculo y la coleccion tienen que servir para algo
+        /// en el otro modo) se pueda probar sin escena ni PlayerPrefs: con la otra firma, en
+        /// EditMode `GameFlow.Activo` es null, `Equipo()` devuelve vacio, y el test daria verde
+        /// midiendo solamente el relleno.
+        public static SlugData[] EquipoJugador(SlugData[] roster, string[] idsEquipo, SlugData elegida)
+        {
             var salida = new SlugData[3];
-            string[] ids = GameFlow.Equipo();
+            string[] ids = idsEquipo != null ? idsEquipo : new string[0];
             int n = 0;
             for (int i = 0; i < ids.Length && n < 3; i++)
             {
@@ -465,11 +545,7 @@ namespace SlugOut.World
                 if (d != null) salida[n++] = d;
             }
 
-            if (n == 0)
-            {
-                SlugData elegida = GameFlow.BabosaElegida();
-                if (elegida != null) salida[n++] = elegida;
-            }
+            if (n == 0 && elegida != null) salida[n++] = elegida;
 
             if (roster != null)
             {

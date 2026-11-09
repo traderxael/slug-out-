@@ -1,5 +1,6 @@
 using System.Collections.Generic;
 using UnityEngine;
+using SlugOut.Core;
 using SlugOut.Slugs;
 
 namespace SlugOut.World
@@ -11,6 +12,7 @@ namespace SlugOut.World
     {
         public static TorneoUI Instancia { get; private set; }
         public static bool Activo { get { return Instancia != null; } }
+        public bool Terminado { get { return _duelo != null && _duelo.Terminado; } }
 
         private Torneo _torneo;
         private Duelo _duelo;
@@ -72,226 +74,355 @@ namespace SlugOut.World
         {
             if (_duelo == null) return;
             GUI.depth = -2;
+            HudTheme.Asegurar();
             float w = Screen.width, h = Screen.height;
-            float m = 40f;
+            float m = 24f;
 
             DibujarFondo(w, h);
 
-            GUI.Label(new Rect(m, 8f, w - m * 2f, 26f), "DUELO · TORNEO",
-                Estilo(20, FontStyle.Bold, new Color(1f, 0.73f, 0.33f), TextAnchor.MiddleLeft));
-            string subtitulo = _duelo.Terminado
-                ? "RONDA " + _torneo.Ronda + " DE " + _torneo.RondasTotales + "   ·   RESULTADO DEL DUELO"
-                : "RONDA " + _torneo.Ronda + " DE " + _torneo.RondasTotales
-                    + "   ·   TURNO " + _duelo.turno
-                    + "   ·   elegis primero; el rival responde";
-            GUI.Label(new Rect(m, 34f, w - m * 2f, 18f), subtitulo,
-                Estilo(11, FontStyle.Bold, new Color(0.66f, 0.74f, 0.84f), TextAnchor.MiddleLeft));
+            float ladoW = Mathf.Clamp(w * 0.29f, 236f, 330f);
+            float centroX = m + ladoW + 16f;
+            float centroW = Mathf.Min(720f, Mathf.Max(220f, w - 2f * centroX));
+            centroX = (w - centroW) * 0.5f;
+            float yPaneles = 68f;
 
-            float colDer = Mathf.Min(w * 0.36f, 430f);
-            float xDer = w - m - colDer;
-            float anchoCarta = Mathf.Min(230f, (xDer - m - 36f) / 3f);
-            if (anchoCarta < 86f) anchoCarta = 86f;
+            DibujarTitulo(m, ladoW);
+            DibujarBanner(centroX, 12f, centroW, 40f);
+            DibujarOrden(centroX, 54f, centroW);
 
-            float yRival = 92f;
-            float yAcciones = h - 70f;
-            float yJugador = yAcciones - 96f;
+            DibujarCombatiente(new Rect(m, yPaneles, ladoW, 98f), _duelo.ActivoJ, true);
+            DibujarCombatiente(new Rect(w - m - ladoW, yPaneles, ladoW, 98f), _duelo.ActivoR, false);
+            DibujarMiniEquipo(new Rect(w - m - ladoW, 182f, ladoW, 54f), _duelo.rival, _duelo.activoRival);
 
-            Fila(m, yRival, anchoCarta, "RIVAL · 3 BABOSAS", _duelo.rival, _duelo.activoRival, false);
-            Fila(m, yJugador, anchoCarta, "TU EQUIPO · 3 BABOSAS", _duelo.jugador, _duelo.activoJugador, true);
+            float altoCentro = h - 88f - 200f;
+            DibujarCentro(new Rect(centroX, 88f, centroW, Mathf.Max(180f, altoCentro)));
 
-            DibujarAcciones(m, yAcciones, anchoCarta, xDer);
+            const float altoInferior = 124f;
+            float yInferior = h - m - altoInferior - 18f;
+            float accionesW = Mathf.Clamp(w * 0.32f, 300f, 400f);
+            float equipoW = w - 2f * m - accionesW - 16f;
+            DibujarEquipo(new Rect(m, yInferior, equipoW, altoInferior));
+            DibujarAcciones(new Rect(w - m - accionesW, yInferior, accionesW, altoInferior));
 
             if (_duelo.Terminado)
             {
-                // El resultado es modal: el tablero queda de fondo y no se corta el registro
-                // contra el borde del panel.
                 Color prev = GUI.color;
-                GUI.color = new Color(0.01f, 0.015f, 0.025f, 0.84f);
-                GUI.DrawTexture(new Rect(0f, 60f, w, h - 60f), Texture2D.whiteTexture);
+                GUI.color = new Color(0.01f, 0.015f, 0.025f, 0.92f);
+                GUI.DrawTexture(new Rect(0f, 0f, w, h), Texture2D.whiteTexture);
                 GUI.color = prev;
                 DibujarResultado(w, h);
-            }
-            else
-            {
-                float disponible = yJugador - 208f;
-                float altoPanel = Mathf.Min(220f, disponible);
-                if (altoPanel < 112f) altoPanel = 112f;
-                float yPanel = 176f + Mathf.Max(0f, (disponible - altoPanel) * 0.5f);
-                DibujarPanelTurno(m, yPanel, xDer - m - 12f, altoPanel);
-                DibujarRegistro(xDer, 176f, colDer, yJugador - 202f);
             }
         }
 
         private void DibujarFondo(float w, float h)
         {
             Color prev = GUI.color;
-            GUI.color = new Color(0.02f, 0.03f, 0.05f, 1f);
+            // Deja ver la cueva/arena de fondo entre los paneles, como la referencia.
+            GUI.color = new Color(0.012f, 0.022f, 0.038f, 0.8f);
             GUI.DrawTexture(new Rect(0f, 0f, w, h), Texture2D.whiteTexture);
-            GUI.color = new Color(0.05f, 0.06f, 0.09f, 0.96f);
-            GUI.DrawTexture(new Rect(0f, 0f, w, 60f), Texture2D.whiteTexture);
-            GUI.DrawTexture(new Rect(0f, h - 56f, w, 56f), Texture2D.whiteTexture);
             GUI.color = prev;
+            HudTheme.Vineta();
+            HudTheme.Linea(new Rect(0f, 59f, w, 1f), new Color(HudTheme.Cian.r, HudTheme.Cian.g, HudTheme.Cian.b, 0.22f));
+            HudTheme.Linea(new Rect(0f, h - 47f, w, 1f), new Color(HudTheme.Cian.r, HudTheme.Cian.g, HudTheme.Cian.b, 0.16f));
         }
 
-        private void Fila(float x, float y, float anchoCarta, string titulo,
-                          List<Combatiente> equipo, int activo, bool esJugador)
+        private void DibujarTitulo(float x, float ancho)
         {
-            GUI.Label(new Rect(x, y - 22f, 280f, 18f), titulo,
-                Estilo(11, FontStyle.Bold,
-                    esJugador ? new Color(0.55f, 0.9f, 0.68f) : new Color(0.95f, 0.52f, 0.47f),
-                    TextAnchor.MiddleLeft));
+            GUI.Label(new Rect(x, 14f, ancho, 24f), "DUELO · TORNEO",
+                HudTheme.Estilo(18, FontStyle.Bold, TextAnchor.UpperLeft, HudTheme.Oro));
+            string sub = "RONDA " + _torneo.Ronda + " DE " + _torneo.RondasTotales
+                + "   ·   " + (_duelo.Terminado ? "RESULTADO" : "TURNO " + (_duelo.turno + 1));
+            GUI.Label(new Rect(x, 38f, ancho, 16f), sub,
+                HudTheme.Estilo(10, FontStyle.Bold, TextAnchor.UpperLeft, HudTheme.Tenue));
+            HudTheme.Linea(new Rect(x, 58f, Mathf.Min(180f, ancho), 2f),
+                new Color(HudTheme.Cian.r, HudTheme.Cian.g, HudTheme.Cian.b, 0.6f));
+        }
 
-            for (int i = 0; i < equipo.Count && i < 3; i++)
+        private void DibujarBanner(float x, float y, float ancho, float alto)
+        {
+            Rect r = new Rect(x, y, ancho, alto);
+            HudTheme.Chip(r);
+            HudTheme.Esquinas(r, new Color(HudTheme.Oro.r, HudTheme.Oro.g, HudTheme.Oro.b, 0.8f), 10f, 1.5f);
+            string txt = _duelo.Terminado
+                ? "DUELO TERMINADO"
+                : "TURNO " + (_duelo.turno + 1).ToString("00") + "   ·   TU TURNO";
+            GUI.Label(r, txt, HudTheme.Estilo(18, FontStyle.Bold, TextAnchor.MiddleCenter, HudTheme.OroClaro));
+        }
+
+        /// Orden de acciones como en la referencia: el turno del jugador, la respuesta IA y
+        /// el siguiente turno. Los colores acompanan para no depender solo del tono.
+        private void DibujarOrden(float x, float y, float ancho)
+        {
+            const float gap = 6f;
+            float anchoChip = (ancho - gap * 2f) / 3f;
+            string[] etiquetas = { "1   TÚ", "2   RIVAL IA", "3   TÚ" };
+            Color[] colores = {
+                HudTheme.OroClaro,
+                new Color(1f, 0.62f, 0.55f),
+                new Color(0.56f, 0.66f, 0.75f)
+            };
+            for (int i = 0; i < 3; i++)
             {
-                Combatiente c = equipo[i];
-                float cx = x + i * (anchoCarta + 12f);
-                Rect r = new Rect(cx, y, anchoCarta, 74f);
-
-                Color prev = GUI.color;
-                GUI.color = !c.Vivo
-                    ? new Color(0.05f, 0.05f, 0.06f, 0.88f)
-                    : i == activo
-                        ? new Color(0.14f, 0.18f, 0.23f, 0.97f)
-                        : new Color(0.08f, 0.09f, 0.12f, 0.92f);
-                GUI.DrawTexture(r, Texture2D.whiteTexture);
-
-                GUI.color = c.datos != null ? c.datos.elementColor : Color.gray;
-                GUI.DrawTexture(new Rect(r.x, r.y, r.width, 3f), Texture2D.whiteTexture);
-                if (i == activo && c.Vivo)
-                    GUI.DrawTexture(new Rect(r.x, r.y, 3f, r.height), Texture2D.whiteTexture);
-                GUI.color = prev;
-
-                Color colorNombre = c.Vivo
-                    ? (i == activo ? new Color(1f, 0.86f, 0.55f) : new Color(0.93f, 0.95f, 0.98f))
-                    : new Color(0.42f, 0.44f, 0.48f);
-                GUI.Label(new Rect(r.x + 10f, r.y + 6f, r.width - 20f, 20f),
-                    c.Nombre + (i == activo && c.Vivo ? "  ·  ACTUA" : ""),
-                    Estilo(12, FontStyle.Bold, colorNombre, TextAnchor.MiddleLeft));
-
-                string elemento = c.datos != null
-                    ? c.Elemento.ToString().ToUpperInvariant()
-                    : "SIN DATOS";
-                GUI.Label(new Rect(r.x + 10f, r.y + 25f, r.width - 20f, 15f), elemento,
-                    Estilo(10, FontStyle.Bold,
-                        c.datos != null ? c.datos.elementColor : new Color(0.6f, 0.6f, 0.6f),
-                        TextAnchor.MiddleLeft));
-
-                Rect barra = new Rect(r.x + 10f, r.y + 44f, r.width - 20f, 8f);
-                GUI.color = new Color(0.14f, 0.16f, 0.20f, 1f);
-                GUI.DrawTexture(barra, Texture2D.whiteTexture);
-                if (c.Vivo)
-                {
-                    GUI.color = esJugador ? new Color(0.45f, 0.82f, 0.62f) : new Color(0.88f, 0.42f, 0.38f);
-                    GUI.DrawTexture(new Rect(barra.x, barra.y, barra.width * Mathf.Clamp01(c.hp / c.hpMax), barra.height),
-                        Texture2D.whiteTexture);
-                }
-                GUI.color = prev;
-
-                string estado = c.Vivo
-                    ? "vida " + Mathf.CeilToInt(c.hp) + "/" + Mathf.CeilToInt(c.hpMax)
-                    : "fuera de combate";
-                if (c.Vivo && c.escudo > 0f) estado += "  esc " + Mathf.CeilToInt(c.escudo);
-                if (c.Vivo && c.quemaduraTurnos > 0) estado += "  arde";
-                if (c.Vivo && c.congeladoTurnos > 0) estado += "  " + c.Estado;
-                GUI.Label(new Rect(r.x + 10f, r.y + 54f, r.width - 20f, 16f), estado,
-                    Estilo(10, FontStyle.Normal, new Color(0.66f, 0.70f, 0.76f), TextAnchor.MiddleLeft));
+                Rect r = new Rect(x + i * (anchoChip + gap), y, anchoChip, 24f);
+                HudTheme.Chip(r);
+                if (i == 0)
+                    HudTheme.Esquinas(r, new Color(HudTheme.Oro.r, HudTheme.Oro.g, HudTheme.Oro.b, 0.9f), 8f, 1.5f);
+                GUI.Label(r, etiquetas[i], HudTheme.Estilo(10, FontStyle.Bold, TextAnchor.MiddleCenter, colores[i]));
             }
         }
 
-        private void DibujarPanelTurno(float x, float y, float ancho, float alto)
+        private void DibujarCombatiente(Rect r, Combatiente c, bool jugador)
         {
-            Color prev = GUI.color;
-            GUI.color = new Color(0.06f, 0.075f, 0.10f, 0.92f);
-            GUI.DrawTexture(new Rect(x, y, ancho, alto), Texture2D.whiteTexture);
-            GUI.color = new Color(1f, 0.73f, 0.33f, 0.85f);
-            GUI.DrawTexture(new Rect(x, y, ancho, 2f), Texture2D.whiteTexture);
-            GUI.color = prev;
+            Color acento = jugador ? HudTheme.Cian : new Color(1f, 0.48f, 0.4f);
+            HudTheme.Panel(r);
+            HudTheme.Esquinas(r, new Color(acento.r, acento.g, acento.b, 0.6f), 12f, 1.5f);
 
-            GUI.Label(new Rect(x + 16f, y + 12f, ancho - 32f, 18f),
+            Color colorElem = c != null && c.datos != null ? c.datos.elementColor : acento;
+            Retrato(new Rect(r.x + 10f, r.y + 17f, 64f, 64f), c, colorElem);
+
+            GUI.Label(new Rect(r.x + 84f, r.y + 8f, r.width - 94f, 14f),
+                jugador ? "TU BABOSA · ACTÚA" : "RIVAL IA · RESPONDE",
+                HudTheme.Estilo(9, FontStyle.Bold, TextAnchor.UpperLeft, acento));
+            GUI.Label(new Rect(r.x + 84f, r.y + 21f, r.width - 94f, 20f),
+                c != null ? c.Nombre : "-",
+                HudTheme.Estilo(16, FontStyle.Bold, TextAnchor.UpperLeft,
+                    c != null && c.Vivo ? HudTheme.Texto : HudTheme.Tenue));
+            GUI.Label(new Rect(r.x + 84f, r.y + 40f, r.width - 94f, 14f),
+                c != null ? c.Elemento.ToString().ToUpperInvariant() : "SIN DATOS",
+                HudTheme.Estilo(9, FontStyle.Bold, TextAnchor.UpperLeft, colorElem));
+
+            float pct = c != null && c.hpMax > 0f ? Mathf.Clamp01(c.hp / c.hpMax) : 0f;
+            HudTheme.Barra(new Rect(r.x + 84f, r.y + 55f, r.width - 94f, 9f), pct,
+                jugador ? HudTheme.Verde : new Color(0.92f, 0.38f, 0.34f));
+
+            string vida = c == null ? "-"
+                : (c.Vivo ? "VIDA " + Mathf.CeilToInt(c.hp) + " / " + Mathf.CeilToInt(c.hpMax) : "FUERA DE COMBATE");
+            if (c != null && c.Vivo && c.escudo > 0f) vida += "   ESC " + Mathf.CeilToInt(c.escudo);
+            if (c != null && c.Vivo && c.quemaduraTurnos > 0) vida += "   ARDE";
+            if (c != null && c.Vivo && c.congeladoTurnos > 0) vida += "   " + c.Estado.ToUpperInvariant();
+            GUI.Label(new Rect(r.x + 84f, r.y + 68f, r.width - 94f, 16f), vida,
+                HudTheme.Estilo(9, FontStyle.Normal, TextAnchor.UpperLeft, HudTheme.Tenue));
+        }
+
+        private void DibujarMiniEquipo(Rect r, List<Combatiente> equipo, int activo)
+        {
+            GUI.Label(new Rect(r.x, r.y - 13f, r.width, 12f), "SU EQUIPO",
+                HudTheme.Estilo(9, FontStyle.Bold, TextAnchor.UpperLeft,
+                    new Color(1f, 0.62f, 0.55f)));
+            const float gap = 6f;
+            float ancho = (r.width - gap * 2f) / 3f;
+            for (int i = 0; i < equipo.Count && i < 3; i++)
+            {
+                Combatiente c = equipo[i];
+                Rect carta = new Rect(r.x + i * (ancho + gap), r.y, ancho, r.height);
+                HudTheme.Chip(carta);
+                if (i == activo && c.Vivo)
+                    HudTheme.Esquinas(carta, new Color(HudTheme.Oro.r, HudTheme.Oro.g, HudTheme.Oro.b, 0.85f), 7f, 1.5f);
+
+                Color acento = c.datos != null ? c.datos.elementColor : HudTheme.Tenue;
+                Retrato(new Rect(carta.x + 4f, carta.y + 9f, 34f, 34f), c, acento);
+                GUI.Label(new Rect(carta.x + 42f, carta.y + 7f, carta.width - 47f, 14f), c.Nombre,
+                    HudTheme.Estilo(9, FontStyle.Bold, TextAnchor.UpperLeft,
+                        c.Vivo ? HudTheme.Texto : HudTheme.Tenue));
+                float pct = c.hpMax > 0f ? Mathf.Clamp01(c.hp / c.hpMax) : 0f;
+                HudTheme.Barra(new Rect(carta.x + 42f, carta.y + 25f, carta.width - 48f, 5f), pct,
+                    new Color(0.92f, 0.38f, 0.34f));
+                GUI.Label(new Rect(carta.x + 42f, carta.y + 33f, carta.width - 47f, 13f),
+                    c.Vivo ? Mathf.CeilToInt(c.hp) + "/" + Mathf.CeilToInt(c.hpMax) : "FUERA",
+                    HudTheme.Estilo(8, FontStyle.Normal, TextAnchor.UpperLeft, HudTheme.Tenue));
+            }
+        }
+
+        private void DibujarCentro(Rect r)
+        {
+            HudTheme.Panel(r);
+            HudTheme.Esquinas(r, new Color(HudTheme.Cian.r, HudTheme.Cian.g, HudTheme.Cian.b, 0.42f), 12f, 1.5f);
+            HudTheme.Linea(new Rect(r.x, r.y, r.width, 2f),
+                new Color(HudTheme.Oro.r, HudTheme.Oro.g, HudTheme.Oro.b, 0.8f));
+
+            GUI.Label(new Rect(r.x + 14f, r.y + 10f, r.width - 28f, 16f),
                 _duelo.Terminado ? "DUELO TERMINADO" : "TU TURNO",
-                Estilo(11, FontStyle.Bold, new Color(1f, 0.73f, 0.33f), TextAnchor.MiddleLeft));
-            GUI.Label(new Rect(x + 16f, y + 32f, ancho - 32f, 30f),
-                "Actua: " + _duelo.ActivoJ.Nombre,
-                Estilo(18, FontStyle.Bold, new Color(0.94f, 0.96f, 0.99f), TextAnchor.MiddleLeft));
-            GUI.Label(new Rect(x + 16f, y + 62f, ancho - 32f, 20f),
+                HudTheme.Estilo(11, FontStyle.Bold, TextAnchor.UpperLeft, HudTheme.Oro));
+            GUI.Label(new Rect(r.x + 14f, r.y + 28f, r.width - 28f, 22f),
+                "Actúa: " + _duelo.ActivoJ.Nombre,
+                HudTheme.Estilo(16, FontStyle.Bold, TextAnchor.UpperLeft, HudTheme.Texto));
+            GUI.Label(new Rect(r.x + 14f, r.y + 51f, r.width - 28f, 16f),
                 "Responde: " + _duelo.ActivoR.Nombre,
-                Estilo(12, FontStyle.Bold, new Color(0.95f, 0.62f, 0.56f), TextAnchor.MiddleLeft));
+                HudTheme.Estilo(10, FontStyle.Bold, TextAnchor.UpperLeft, new Color(1f, 0.62f, 0.55f)));
 
             SlugData d = _duelo.ActivoJ.datos;
             string efecto = d != null ? Duelo.NombreEfecto(d.abilityType) : "sin habilidad";
-            string texto = "EFECTO: " + efecto + "\nLIMITE EN DUELO: una vez cada dos turnos";
+            string texto = "EFECTO   " + efecto + "\nLÍMITE   una vez cada "
+                + Duelo.EnfriamientoHabilidad + " turnos";
+            if (d != null && Contrajuego.Tiene(d.abilityType))
+                texto += "\nCONTRAJUEGO   " + Contrajuego.De(d.abilityType).texto;
             if (d != null && !string.IsNullOrEmpty(d.limitacion))
-                texto += "\nEN EL CAMPO: " + d.limitacion;
-            float yTexto = y + 88f;
-            float altoTexto = alto - 118f;
-            if (altoTexto >= 28f)
-                GUI.Label(new Rect(x + 16f, yTexto, ancho - 32f, altoTexto), texto,
-                    Estilo(11, FontStyle.Normal, new Color(0.74f, 0.79f, 0.86f), TextAnchor.UpperLeft));
+                texto += "\nEN EL CAMPO   " + d.limitacion;
 
-            if (!_duelo.Terminado && alto >= 170f)
-                GUI.Label(new Rect(x + 16f, y + alto - 26f, ancho - 32f, 18f),
-                    "Elegi abajo. El rival responde despues de tu accion.",
-                    Estilo(10, FontStyle.Normal, new Color(0.55f, 0.61f, 0.70f), TextAnchor.MiddleLeft));
-        }
+            float yEfecto = r.y + 72f;
+            float altoEfecto = Mathf.Clamp(r.height * 0.32f, 54f, 110f);
+            GUI.Label(new Rect(r.x + 14f, yEfecto, r.width - 28f, altoEfecto), texto,
+                Envolver(10, new Color(0.74f, 0.81f, 0.88f)));
 
-        private void DibujarRegistro(float x, float y, float ancho, float alto)
-        {
-            GUI.Label(new Rect(x, y, ancho, 18f), "ULTIMOS MOVIMIENTOS",
-                Estilo(11, FontStyle.Bold, new Color(0.58f, 0.72f, 0.82f), TextAnchor.MiddleLeft));
-
-            int capacidad = Mathf.Clamp(Mathf.FloorToInt((alto - 28f) / 19f), 3, 20);
+            float yLog = yEfecto + altoEfecto + 6f;
+            GUI.Label(new Rect(r.x + 14f, yLog, r.width - 28f, 16f), "ÚLTIMOS MOVIMIENTOS",
+                HudTheme.Estilo(9, FontStyle.Bold, TextAnchor.UpperLeft, HudTheme.CianTenue));
+            int capacidad = Mathf.Clamp(Mathf.FloorToInt((r.y + r.height - 14f - (yLog + 18f)) / 16f), 2, 12);
             int desde = Mathf.Max(0, _duelo.registro.Count - capacidad);
             for (int i = desde; i < _duelo.registro.Count; i++)
             {
                 string linea = _duelo.registro[i];
-                Color color = new Color(0.80f, 0.84f, 0.89f);
+                Color color = new Color(0.80f, 0.85f, 0.9f);
                 if (linea.StartsWith("Tu ")) color = new Color(0.62f, 0.90f, 0.74f);
                 else if (linea.StartsWith("El rival")) color = new Color(0.95f, 0.68f, 0.62f);
                 else if (linea.StartsWith("Ganaste")) color = new Color(0.55f, 0.95f, 0.72f);
                 else if (linea.StartsWith("Perdiste")) color = new Color(0.97f, 0.55f, 0.50f);
-
-                GUI.Label(new Rect(x, y + 24f + (i - desde) * 19f, ancho, 18f), "· " + linea,
-                    Estilo(10, FontStyle.Normal, color, TextAnchor.MiddleLeft));
+                GUI.Label(new Rect(r.x + 14f, yLog + 18f + (i - desde) * 16f, r.width - 28f, 15f),
+                    "› " + linea, HudTheme.Estilo(9, FontStyle.Normal, TextAnchor.UpperLeft, color));
             }
         }
 
-        private void DibujarAcciones(float x, float y, float anchoCarta, float xDer)
+        private void DibujarEquipo(Rect r)
         {
-            if (_duelo.Terminado) return;
-            bool puedeActuar = _duelo.ActivoJ.Vivo;
+            GUI.Label(new Rect(r.x, r.y - 20f, r.width, 16f),
+                _eligiendoCambio ? "TU EQUIPO   ·   ELEGÍ EL RELEVO ABAJO" : "TU EQUIPO",
+                HudTheme.Estilo(11, FontStyle.Bold, TextAnchor.UpperLeft, HudTheme.Oro));
+
+            const float gap = 8f;
+            float ancho = (r.width - gap * 2f) / 3f;
+            for (int i = 0; i < _duelo.jugador.Count && i < 3; i++)
+            {
+                Combatiente c = _duelo.jugador[i];
+                Rect carta = new Rect(r.x + i * (ancho + gap), r.y, ancho, r.height);
+                bool activo = i == _duelo.activoJugador;
+                HudTheme.Panel(carta);
+                if (activo && c.Vivo)
+                    HudTheme.Esquinas(carta, new Color(HudTheme.Oro.r, HudTheme.Oro.g, HudTheme.Oro.b, 0.9f), 11f, 1.8f);
+                Color acento = c.datos != null ? c.datos.elementColor : HudTheme.Cian;
+                HudTheme.Linea(new Rect(carta.x + 1f, carta.y + 1f, carta.width - 2f, 2f),
+                    new Color(acento.r, acento.g, acento.b, c.Vivo ? 0.9f : 0.25f));
+
+                Retrato(new Rect(carta.x + 10f, carta.y + 28f, 64f, 64f), c, acento);
+
+                GUI.Label(new Rect(carta.x + 82f, carta.y + 10f, carta.width - 92f, 18f), c.Nombre,
+                    HudTheme.Estilo(14, FontStyle.Bold, TextAnchor.UpperLeft,
+                        c.Vivo ? HudTheme.Texto : HudTheme.Tenue));
+                GUI.Label(new Rect(carta.x + 82f, carta.y + 30f, carta.width - 92f, 13f),
+                    (activo ? "ACTIVA" : "EN ESPERA") + "   ·   " + c.Elemento.ToString().ToUpperInvariant(),
+                    HudTheme.Estilo(8, FontStyle.Bold, TextAnchor.UpperLeft,
+                        activo && c.Vivo ? HudTheme.OroClaro : acento));
+
+                float pct = c.hpMax > 0f ? Mathf.Clamp01(c.hp / c.hpMax) : 0f;
+                HudTheme.Barra(new Rect(carta.x + 82f, carta.y + 51f, carta.width - 92f, 8f), pct,
+                    c.Vivo ? HudTheme.Verde : new Color(0.4f, 0.42f, 0.46f));
+                GUI.Label(new Rect(carta.x + 82f, carta.y + 63f, carta.width - 92f, 14f),
+                    c.Vivo ? "VIDA " + Mathf.CeilToInt(c.hp) + " / " + Mathf.CeilToInt(c.hpMax) : "FUERA",
+                    HudTheme.Estilo(9, FontStyle.Normal, TextAnchor.UpperLeft, HudTheme.Tenue));
+                if (c.Vivo && c.escudo > 0f)
+                    GUI.Label(new Rect(carta.x + 82f, carta.y + 78f, carta.width - 92f, 13f),
+                        "ESCUDO " + Mathf.CeilToInt(c.escudo),
+                        HudTheme.Estilo(8, FontStyle.Bold, TextAnchor.UpperLeft, HudTheme.Cian));
+            }
+        }
+
+        private void DibujarAcciones(Rect r)
+        {
+            HudTheme.Panel(r);
+            HudTheme.Esquinas(r, new Color(HudTheme.Cian.r, HudTheme.Cian.g, HudTheme.Cian.b, 0.42f), 11f, 1.5f);
 
             if (_eligiendoCambio)
             {
-                float anchoCancelar = 90f;
-                float anchoSlot = (xDer - x - anchoCancelar - 36f) / 3f;
+                GUI.Label(new Rect(r.x + 14f, r.y + 8f, r.width - 28f, 16f), "ELIGE EL RELEVO",
+                    HudTheme.Estilo(11, FontStyle.Bold, TextAnchor.UpperLeft, HudTheme.Oro));
+                const float gap = 6f;
+                float ancho = (r.width - 28f - gap * 2f) / 3f;
                 for (int i = 0; i < 3; i++)
                 {
                     Combatiente c = _duelo.jugador[i];
                     bool puede = c.Vivo && i != _duelo.activoJugador;
-                    string texto = c.Nombre + " · " + Mathf.CeilToInt(c.hp) + "/" + Mathf.CeilToInt(c.hpMax);
-                    if (Boton(new Rect(x + i * (anchoSlot + 12f), y, anchoSlot, 42f), texto, puede))
+                    Rect b = new Rect(r.x + 14f + i * (ancho + gap), r.y + 30f, ancho, 40f);
+                    if (puede)
                     {
-                        _eligiendoCambio = false;
-                        Turno(AccionDuelo.Cambiar, i);
+                        if (HudTheme.BotonChico(b, c.Nombre))
+                        {
+                            _eligiendoCambio = false;
+                            Turno(AccionDuelo.Cambiar, i);
+                        }
                     }
+                    else Deshabilitado(b, c.Nombre);
                 }
-                if (Boton(new Rect(x + 3f * (anchoSlot + 12f), y, anchoCancelar, 42f), "CANCELAR", true))
+                if (HudTheme.Boton(new Rect(r.x + 14f, r.y + 78f, r.width - 28f, 34f), "CANCELAR"))
                     _eligiendoCambio = false;
                 return;
             }
 
-            if (Boton(new Rect(x, y, anchoCarta, 42f), "ATACAR", puedeActuar))
-                Turno(AccionDuelo.Atacar);
+            GUI.Label(new Rect(r.x + 14f, r.y + 8f, r.width - 28f, 16f), "ACCIONES",
+                HudTheme.Estilo(11, FontStyle.Bold, TextAnchor.UpperLeft, HudTheme.Oro));
 
+            bool puedeActuar = !_duelo.Terminado && _duelo.ActivoJ.Vivo;
+            if (puedeActuar)
+            {
+                if (HudTheme.BotonOro(new Rect(r.x + 14f, r.y + 30f, r.width - 28f, 42f), "ATACAR"))
+                    Turno(AccionDuelo.Atacar);
+            }
+            else Deshabilitado(new Rect(r.x + 14f, r.y + 30f, r.width - 28f, 42f), "ATACAR");
+
+            float mitad = (r.width - 28f - 8f) * 0.5f;
+            Rect hab = new Rect(r.x + 14f, r.y + 80f, mitad, 34f);
             bool puedeHabilidad = puedeActuar && _duelo.ActivoJ.enfriamiento == 0;
             string etiquetaH = _duelo.ActivoJ.enfriamiento > 0
                 ? "HABILIDAD · " + _duelo.ActivoJ.enfriamiento
                 : "HABILIDAD";
-            if (Boton(new Rect(x + anchoCarta + 12f, y, anchoCarta, 42f), etiquetaH, puedeHabilidad))
-                Turno(AccionDuelo.Habilidad);
+            if (puedeHabilidad)
+            {
+                if (HudTheme.Boton(hab, etiquetaH)) Turno(AccionDuelo.Habilidad);
+            }
+            else Deshabilitado(hab, etiquetaH);
 
-            if (Boton(new Rect(x + (anchoCarta + 12f) * 2f, y, anchoCarta, 42f), "CAMBIAR", puedeActuar))
-                _eligiendoCambio = true;
+            Rect cambiar = new Rect(r.x + 14f + mitad + 8f, r.y + 80f, mitad, 34f);
+            if (puedeActuar)
+            {
+                if (HudTheme.Boton(cambiar, "CAMBIAR")) _eligiendoCambio = true;
+            }
+            else Deshabilitado(cambiar, "CAMBIAR");
+        }
+
+        /// Si el roster no tiene sprite, `LoadSprite` devuelve un cuadro liso de 8x8. En el
+        /// duelo eso se ve como un hueco gris; aca se dibuja un emblema con la inicial y el
+        /// elemento, sin inventar retratos que el juego no tiene.
+        private static void Retrato(Rect r, Combatiente c, Color acento)
+        {
+            Texture2D tex = c != null && c.datos != null ? SlugArenaGame.LoadSprite(c.datos, true) : null;
+            bool real = tex != null && !tex.name.StartsWith("retrato_");
+            if (real)
+            {
+                HudTheme.Retrato(r, tex, acento);
+                return;
+            }
+
+            HudTheme.Chip(r);
+            Color prev = GUI.color;
+            GUI.color = new Color(acento.r, acento.g, acento.b, 0.22f);
+            GUI.DrawTexture(new Rect(r.x + 3f, r.y + 3f, r.width - 6f, r.height - 6f), Texture2D.whiteTexture);
+            GUI.color = prev;
+            HudTheme.Esquinas(r, new Color(acento.r, acento.g, acento.b, 0.85f),
+                Mathf.Min(10f, r.height * 0.25f), 1.5f);
+            string inicial = c != null && c.datos != null && !string.IsNullOrEmpty(c.datos.slugName)
+                ? c.datos.slugName.Substring(0, 1).ToUpperInvariant() : "?";
+            GUI.Label(r, inicial, HudTheme.Estilo(Mathf.Max(12, Mathf.RoundToInt(r.height * 0.42f)),
+                FontStyle.Bold, TextAnchor.MiddleCenter, acento));
+            if (r.height >= 50f)
+                GUI.Label(new Rect(r.x, r.yMax - 14f, r.width, 12f),
+                    c != null ? c.Elemento.ToString().ToUpperInvariant() : "",
+                    HudTheme.Estilo(8, FontStyle.Bold, TextAnchor.MiddleCenter,
+                        new Color(acento.r, acento.g, acento.b, 0.9f)));
+        }
+
+        private static void Deshabilitado(Rect r, string texto)
+        {
+            HudTheme.Chip(r);
+            GUI.Label(r, texto, HudTheme.Estilo(12, FontStyle.Bold, TextAnchor.MiddleCenter,
+                new Color(0.46f, 0.5f, 0.56f)));
         }
 
         private void Turno(AccionDuelo accion, int indiceCambio = -1)
@@ -308,36 +439,30 @@ namespace SlugOut.World
             bool gano = _duelo.GanoJugador;
             bool ultima = _torneo.Ronda >= _torneo.RondasTotales;
             float ancho = Mathf.Min(560f, w - 80f);
-            float alto = 216f;
+            float alto = 218f;
             Rect panel = new Rect((w - ancho) * 0.5f, (h - alto) * 0.5f, ancho, alto);
+            Color acento = gano ? HudTheme.Verde : HudTheme.Rojo;
 
-            Color prev = GUI.color;
-            GUI.color = new Color(0.03f, 0.04f, 0.06f, 0.98f);
-            GUI.DrawTexture(panel, Texture2D.whiteTexture);
-            GUI.color = gano ? new Color(0.45f, 0.9f, 0.68f) : new Color(0.95f, 0.45f, 0.4f);
-            GUI.DrawTexture(new Rect(panel.x, panel.y, panel.width, 3f), Texture2D.whiteTexture);
-            GUI.DrawTexture(new Rect(panel.x, panel.y + panel.height - 3f, panel.width, 3f), Texture2D.whiteTexture);
-            GUI.color = prev;
+            HudTheme.Panel(panel);
+            HudTheme.Esquinas(panel, acento, 16f, 2f);
+            HudTheme.Linea(new Rect(panel.x, panel.y, panel.width, 3f), acento);
 
-            GUI.Label(new Rect(panel.x, panel.y + 18f, panel.width, 36f),
+            GUI.Label(new Rect(panel.x, panel.y + 16f, panel.width, 36f),
                 gano ? "GANASTE EL DUELO" : "PERDISTE EL DUELO",
-                Estilo(24, FontStyle.Bold,
-                    gano ? new Color(0.5f, 0.92f, 0.72f) : new Color(0.97f, 0.52f, 0.47f),
-                    TextAnchor.MiddleCenter));
+                HudTheme.Estilo(24, FontStyle.Bold, TextAnchor.MiddleCenter, acento));
 
             string detalle;
             if (gano && ultima) detalle = "Torneo completado: ganaste las " + _torneo.RondasTotales + " rondas.";
             else if (gano) detalle = "Ronda " + _torneo.Ronda + " superada. Siguiente: ronda " + (_torneo.Ronda + 1) + ".";
             else detalle = "El torneo termina en la ronda " + _torneo.Ronda + ". Podes armar otro equipo.";
-
-            GUI.Label(new Rect(panel.x + 20f, panel.y + 62f, panel.width - 40f, 42f), detalle,
-                Estilo(12, FontStyle.Normal, new Color(0.82f, 0.86f, 0.91f), TextAnchor.UpperCenter));
+            GUI.Label(new Rect(panel.x + 24f, panel.y + 60f, panel.width - 48f, 42f), detalle,
+                HudTheme.Estilo(12, FontStyle.Normal, TextAnchor.UpperCenter, HudTheme.Texto));
 
             float bw = (panel.width - 56f) * 0.5f;
             float by = panel.y + panel.height - 64f;
             if (gano && !ultima)
             {
-                if (Boton(new Rect(panel.x + 20f, by, bw, 40f), "SIGUIENTE RONDA", true))
+                if (HudTheme.BotonOro(new Rect(panel.x + 20f, by, bw, 40f), "SIGUIENTE RONDA"))
                 {
                     _torneo.Continuar();
                     _duelo = _torneo.DueloActual;
@@ -346,51 +471,32 @@ namespace SlugOut.World
             }
             else
             {
-                if (Boton(new Rect(panel.x + 20f, by, bw, 40f), "NUEVO TORNEO", true))
+                if (HudTheme.BotonOro(new Rect(panel.x + 20f, by, bw, 40f), "NUEVO TORNEO"))
                     EmpezarTorneo(Random.Range(1, 999999));
             }
 
-            if (Boton(new Rect(panel.x + 36f + bw, by, bw, 40f), "VOLVER AL MENU", true))
+            if (HudTheme.Boton(new Rect(panel.x + 36f + bw, by, bw, 40f), "VOLVER AL MENU"))
                 Cerrar();
         }
 
-        private bool Boton(Rect r, string texto, bool activo)
-        {
-            bool hover = activo && r.Contains(Event.current.mousePosition);
-            Color prev = GUI.color;
-            GUI.color = !activo
-                ? new Color(0.07f, 0.08f, 0.10f, 0.88f)
-                : hover
-                    ? new Color(0.22f, 0.26f, 0.32f, 1f)
-                    : new Color(0.13f, 0.16f, 0.21f, 1f);
-            GUI.DrawTexture(r, Texture2D.whiteTexture);
-            GUI.color = activo
-                ? new Color(1f, 0.73f, 0.33f, 0.9f)
-                : new Color(0.30f, 0.32f, 0.36f, 0.8f);
-            GUI.DrawTexture(new Rect(r.x, r.y, 3f, r.height), Texture2D.whiteTexture);
-            GUI.color = prev;
+        private static GUIStyle _envolver;
 
-            if (!activo)
+        private static GUIStyle Envolver(int tam, Color color)
+        {
+            if (_envolver == null)
             {
-                GUI.Label(new Rect(r.x + 8f, r.y, r.width - 16f, r.height), texto,
-                    Estilo(12, FontStyle.Bold, new Color(0.50f, 0.53f, 0.58f), TextAnchor.MiddleCenter));
-                return false;
+                _envolver = new GUIStyle(GUI.skin.label)
+                {
+                    wordWrap = true,
+                    richText = false,
+                    clipping = TextClipping.Clip
+                };
+                _envolver.font = HudTheme.Fuente;
             }
-            return GUI.Button(new Rect(r.x + 3f, r.y + 2f, r.width - 6f, r.height - 4f), texto,
-                Estilo(12, FontStyle.Bold, new Color(0.94f, 0.95f, 0.98f), TextAnchor.MiddleCenter));
-        }
-
-        private static GUIStyle _estilo;
-
-        private static GUIStyle Estilo(int tam, FontStyle f, Color c, TextAnchor alineacion)
-        {
-            if (_estilo == null)
-                _estilo = new GUIStyle(GUI.skin.label) { clipping = TextClipping.Clip, richText = false };
-            _estilo.fontSize = tam;
-            _estilo.fontStyle = f;
-            _estilo.alignment = alineacion;
-            _estilo.normal.textColor = c;
-            return _estilo;
+            _envolver.fontSize = tam;
+            _envolver.normal.textColor = color;
+            _envolver.alignment = TextAnchor.UpperLeft;
+            return _envolver;
         }
     }
 }

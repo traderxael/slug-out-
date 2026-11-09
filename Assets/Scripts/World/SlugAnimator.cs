@@ -71,7 +71,6 @@ namespace SlugOut.World
         private Color _baseColor;
         private Color _baseEmission;
         private bool _emisivoBase;
-        private bool _emisivoPrendido;
 
         private void Awake()
         {
@@ -109,10 +108,9 @@ namespace SlugOut.World
                 return;
             }
             _mat = _rend.material;   // instancia propia: el flash no toca a los demas slugs
-            _baseColor = _mat.color;
-            _baseEmission = _mat.HasProperty("_EmissionColor") ? _mat.GetColor("_EmissionColor") : Color.black;
-            _emisivoBase = _mat.IsKeywordEnabled("_EMISSION");
-            _emisivoPrendido = false;
+            _baseColor = MaterialesPixar.ColorBase(_mat);
+            _baseEmission = MaterialesPixar.Emision(_mat);
+            _emisivoBase = _baseEmission != Color.black;
         }
 
         private void Start()
@@ -151,18 +149,8 @@ namespace SlugOut.World
         {
             if (_mat == null) return;
             // devolver el glow EXACTO que tenia: la arena pinta emisivo elemental (color*0.6)
-            if (_emisivoBase)
-            {
-                _mat.EnableKeyword("_EMISSION");
-                _mat.SetColor("_EmissionColor", _baseEmission);
-            }
-            else
-            {
-                _mat.DisableKeyword("_EMISSION");
-                _mat.SetColor("_EmissionColor", Color.black);
-            }
-            _emisivoPrendido = false;
-            _mat.color = _baseColor;
+            MaterialesPixar.SetEmision(_mat, _emisivoBase ? _baseEmission : Color.black);
+            MaterialesPixar.SetColorBase(_mat, _baseColor);
         }
 
         private void Update()
@@ -312,8 +300,7 @@ namespace SlugOut.World
                 transform.localScale = _escalaInicial * escala;
                 if (_mat != null && _hitT < 0f)
                 {
-                    _mat.EnableKeyword("_EMISSION");
-                    _mat.SetColor("_EmissionColor", Color.Lerp(_baseEmission, AvisoColor, aviso * 0.7f));
+                    MaterialesPixar.SetEmision(_mat, Color.Lerp(_baseEmission, AvisoColor, aviso * 0.7f));
                 }
             }
             else if (_mat != null && _hitT < 0f && _actor != null && _actor.Alive && !_actor.Capturada)
@@ -333,13 +320,8 @@ namespace SlugOut.World
         {
             EnsureMat();   // el cuerpo visible puede haber cambiado desde Awake
             if (_mat == null) return;
-            if (!_emisivoPrendido)
-            {
-                _mat.EnableKeyword("_EMISSION");
-                _emisivoPrendido = true;
-            }
             float fuerza = GameFlow.ReducirDestellos ? hitFlash * 0.2f : hitFlash;
-            _mat.SetColor("_EmissionColor", Color.white * fuerza);
+            MaterialesPixar.SetEmision(_mat, Color.white * fuerza);
         }
     }
 }

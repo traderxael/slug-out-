@@ -31,13 +31,8 @@ namespace SlugOut.World
             // mantener Q conjura la habilidad detras del menu.
             if (GameFeel.Pausa || SlugArenaGame.CombateCongelado) return;
             _cd -= Time.deltaTime;
-#if ENABLE_INPUT_SYSTEM
-            UnityEngine.InputSystem.Keyboard kb = UnityEngine.InputSystem.Keyboard.current;
-            bool q = kb != null && kb.qKey.isPressed;
-#else
-            bool q = Input.GetKey(KeyCode.Q);
-#endif
-            if (q) Usar();
+            EntradaFrame e = EntradaJuego.Leer();
+            if (e.habilidad) Usar();
         }
 
         /// Publica: las pruebas la llaman directo, sin depender del foco de la ventana.

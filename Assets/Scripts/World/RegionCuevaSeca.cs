@@ -145,6 +145,8 @@ namespace SlugOut.World
         private static Material Nuevo(Shader s, string nombre, Color c, float metal, float rug,
                                       Color? emision = null)
         {
+            if (s == null) s = Shaders.Lit();
+            if (s == null) return null;
             var m = new Material(s) { name = "region_" + nombre, color = c };
             if (_instanciaActiva != null) _instanciaActiva._materialesDelPaso.Add(m);
             if (m.HasProperty("_Metallic")) m.SetFloat("_Metallic", metal);
@@ -170,7 +172,7 @@ namespace SlugOut.World
             Terrain3D.DesfaseRegion = d.relieveDesfase;
             Terrain3D.AmplitudRegion = d.relieveAmplitud;
             Terrain3D t = Terrain3D.Activo != null
-                ? Terrain3D.Activo : Object.FindFirstObjectByType<Terrain3D>();
+                ? Terrain3D.Activo : Object.FindAnyObjectByType<Terrain3D>();
             if (t != null) t.Reconstruir();
             Debug.Log("[Region] relieve " + d.nombre + " desfase=" + d.relieveDesfase
                 + " amplitud=" + d.relieveAmplitud.ToString("F2"));
@@ -193,12 +195,13 @@ namespace SlugOut.World
             RegionDefinicion d = Def;
             Terrain3D terreno = Terrain3D.Activo != null
                 ? Terrain3D.Activo : GetComponent<Terrain3D>();
-            if (terreno == null) terreno = Object.FindFirstObjectByType<Terrain3D>();
+            if (terreno == null) terreno = Object.FindAnyObjectByType<Terrain3D>();
             // El Terreno viene escalado 5x en la escena. Normalizar antes de leer lossyScale
             // evita que el root de la region quede compensando una escala que ya no existe.
             if (terreno != null) terreno.NormalizarEscala();
             radio = d.radioHabitat > 0.001f ? d.radioHabitat : radio;
             Materiales();
+            var _nm = GetComponent<NivelMejoras>(); if (_nm == null) _nm = gameObject.AddComponent<NivelMejoras>();
             AplicarRelieve(d);
             AplicarPaletaTerreno(d, terreno);
             var go = new GameObject("Region_" + Clave(d.nombre));
@@ -631,7 +634,9 @@ namespace SlugOut.World
                 espesor.y = 8f;
                 t.localScale = espesor;
                 Renderer r = p.GetComponent<Renderer>();
-                if (r != null) r.sharedMaterial = _rocaPared;
+                // Sin el _rocaPared (region no construida) no se pisa el material: antes
+                // dejaba las cuatro paredes con material nulo y se veian magenta.
+                if (r != null && _rocaPared != null) r.sharedMaterial = _rocaPared;
             }
 
             for (int s = 0; s < 4; s++)
@@ -1170,7 +1175,7 @@ namespace SlugOut.World
                  basePos + Vector3.up * 3.8f, _rocaClara, null, true);
             Caja(g, "fondo_oscuro", new Vector3(3.2f, 3.4f, 0.3f),
                  basePos + g.forward * 0.5f + Vector3.up * 1.7f,
-                 Nuevo(Shader.Find("Universal Render Pipeline/Lit"), "tunel_fondo",
+                 Nuevo(SlugOut.World.Shaders.Lit(), "tunel_fondo",
                        new Color(0.02f, 0.02f, 0.03f), 0f, 1f));
             Esfera(g, "marca", 0.22f, basePos + Vector3.up * 1.4f + g.forward * -0.7f, _brasa);
             Luz(g, "luz_tunel", new Color(1f, 0.65f, 0.30f), 4.5f, 3f,
@@ -1270,9 +1275,9 @@ namespace SlugOut.World
         {
             Transform g = Grupo("Microhabitat_BosqueBambu", EnPiso(angulo, radio));
             g.rotation = Quaternion.Euler(0f, -angulo, 0f);
-            Material bambu = Nuevo(Shader.Find("Universal Render Pipeline/Lit"), "bambu",
+            Material bambu = Nuevo(SlugOut.World.Shaders.Lit(), "bambu",
                                    new Color(0.28f, 0.58f, 0.22f), 0f, 0.6f);
-            Material hoja = Nuevo(Shader.Find("Universal Render Pipeline/Lit"), "hoja",
+            Material hoja = Nuevo(SlugOut.World.Shaders.Lit(), "hoja",
                                   new Color(0.35f, 0.68f, 0.25f), 0f, 0.7f, new Color(0.10f, 0.25f, 0.05f));
             for (int i = 0; i < 7; i++)
             {
