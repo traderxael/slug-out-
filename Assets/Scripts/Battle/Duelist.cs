@@ -9,7 +9,6 @@ namespace SlugOut.Battle
     public class Duelist : MonoBehaviour, IDuelistTarget
     {
         [Header("Configuracion")]
-        [SerializeField] private string duelistName = "Eli Shane";
         [SerializeField] private bool isPlayer = true;
         [SerializeField] private ElementType defenderElement = ElementType.Fire;
 

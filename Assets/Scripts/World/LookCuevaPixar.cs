@@ -39,7 +39,9 @@ namespace SlugOut.World
             CrearMateriales();
             TechoDeCueva(centro);
             CrearRelleno();
+#if SLUGOUT_URP
             ConfigurarPostProceso();
+#endif
 
             GameObject root = new GameObject("CuevaPixar");
             _gShell = Grupo(root.transform, "Grupo_Shell");
@@ -236,9 +238,10 @@ namespace SlugOut.World
         /// El Volume global del mapa tenia un perfil sin componentes. Se completa con bloom
         /// (agua/hongos/cristales), un poco de contraste y una vineta de escena; el HUD IMGUI
         /// se dibuja despues del post-proceso y queda nitido.
+#if SLUGOUT_URP
         private static void ConfigurarPostProceso()
         {
-            Volume vol = Object.FindFirstObjectByType<Volume>();
+            Volume vol = Object.FindAnyObjectByType<Volume>();
             if (vol == null)
             {
                 GameObject go = new GameObject("PostProceso");
@@ -270,6 +273,7 @@ namespace SlugOut.World
             Debug.Log("[Cueva] post-proceso bloom activo");
         }
 
+#endif
         private void TechoDeCueva(Vector3 centro)
         {
             GameObject cueva = GameObject.CreatePrimitive(PrimitiveType.Sphere);
@@ -637,7 +641,7 @@ namespace SlugOut.World
         /// Bocas de tunel de la region que esta de pie, proyectadas al suelo.
         Vector3[] BocasRegion()
         {
-            RegionCuevaSeca region = Object.FindFirstObjectByType<RegionCuevaSeca>();
+            RegionCuevaSeca region = Object.FindAnyObjectByType<RegionCuevaSeca>();
             Transform[] raices = region != null ? region.TunelesRaiz : null;
             if (raices == null) return new Vector3[0];
             var v = new Vector3[raices.Length];

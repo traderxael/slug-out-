@@ -93,7 +93,7 @@ namespace SlugOut.Tests
         [Test]
         public void VentanaDeEsquivaDependeDeLosStatsYNoDelAzar()
         {
-            const float margen = 0.9f, ventana = 0.46f, agachada = 0.2f;
+            const float margen = 0.9f, ventana = 0.46f;
 
             // bicho lento: el paso lateral no saca medio cuerpo del corredor, jamas esquiva
             float pasoLento = 1.0f * 2.2f * 0.26f;

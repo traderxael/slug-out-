@@ -264,7 +264,7 @@ namespace SlugOut.World
             _fase = (transform.position.x + transform.position.z) * 0.37f;
             CreamosModelo();
             SombraContacto.Agregar(transform, 0.30f);
-            PlayerController pc = Object.FindFirstObjectByType<PlayerController>();
+            PlayerController pc = Object.FindAnyObjectByType<PlayerController>();
             if (pc != null)
             {
                 _jugador = pc.transform;
@@ -310,7 +310,7 @@ namespace SlugOut.World
 
             if (_jugador == null)
             {
-                PlayerController pc = Object.FindFirstObjectByType<PlayerController>();
+                PlayerController pc = Object.FindAnyObjectByType<PlayerController>();
                 if (pc != null) _jugador = pc.transform;
             }
             bool nuevaVentana = false;

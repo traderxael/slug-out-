@@ -24,8 +24,6 @@ namespace SlugOut.Battle
         [SerializeField] private Camera mainCamera;
         [SerializeField] private GameObject clashSparkPrefab;
 
-        private float _maxPlayerProjSpeed = 0f;
-
         private void Awake()
         {
             if (Instance == null) Instance = this;
@@ -60,7 +58,7 @@ namespace SlugOut.Battle
         private void UpdateFastestProjectileSpeed()
         {
             // Buscar proyectiles activos para mostrar velocimetro en vivo
-            SlugProjectile[] projs = FindObjectsByType<SlugProjectile>(FindObjectsSortMode.None);
+            SlugProjectile[] projs = FindObjectsByType<SlugProjectile>();
             float topSpeed = 0f;
 
             foreach (var p in projs)

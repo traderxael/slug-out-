@@ -17,7 +17,6 @@ namespace SlugOut.World
         [SerializeField] private bool activo = true;
         [SerializeField] private float intervalo = 7f;
         [SerializeField] private float avisoDuracion = 1.15f;
-        [SerializeField] private int maxSimultaneas = 1;
 
         [Header("Caida")]
         [SerializeField] private float alturaCaida = 15f;
@@ -74,7 +73,7 @@ namespace SlugOut.World
 
         private void Start()
         {
-            PlayerController pc = Object.FindFirstObjectByType<PlayerController>();
+            PlayerController pc = Object.FindAnyObjectByType<PlayerController>();
             if (pc != null) _jugador = pc.transform;
             if (_jugador != null) _foe = _jugador.GetComponent<SlugActor>();
             _timer = intervalo * 0.5f;
@@ -226,14 +225,12 @@ namespace SlugOut.World
             r.go.transform.localScale *= 1.15f;
             DustEn(r.destino);
             _pendientes--;
-            bool adentro = false;
             if (_foe != null && _foe.Alive)
             {
                 Vector3 a = _foe.transform.position;
                 float dx = a.x - r.destino.x, dz = a.z - r.destino.z;
                 if (dx * dx + dz * dz <= radioDanio * radioDanio)
                 {
-                    adentro = true;
                     _huboGolpe = true;
                     _impactos++;
                     _foe.TakeDamage(dano, ElementType.Earth);

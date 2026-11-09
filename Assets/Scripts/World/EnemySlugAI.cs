@@ -68,6 +68,11 @@ namespace SlugOut.World
         [Header("Separacion (para que no se apilen)")]
         [Tooltip("Distancia a la que dos babosas se empujan. Sin esto cuatro perseguidores ocupan el mismo punto y tapan la pelea.")]
         [SerializeField] private float separacionRadio = 1.2f;
+        [Header("Patrulla (skill game-ai)")]
+        [SerializeField] private float wanderRadio = 8f;
+        [SerializeField] private float wanderDistancia = 18f;
+        private Vector3 _wanderObjetivo;
+        private float _wanderTimer;
         [SerializeField] private float separacionFuerza = 0.65f;
 
         [Header("Escupidor (a distancia)")]
@@ -245,7 +250,7 @@ namespace SlugOut.World
         {
             if (target == null)
             {
-                PlayerController pc = Object.FindFirstObjectByType<PlayerController>();
+                PlayerController pc = Object.FindAnyObjectByType<PlayerController>();
                 if (pc != null) target = pc.transform;
             }
             if (target != null) _foe = target.GetComponent<SlugActor>();
@@ -325,6 +330,24 @@ namespace SlugOut.World
                     progresoAviso = 0f;
                     if (dist > rangoEmbestida)
                     {
+                        // Patrulla lejana (game-ai): si el jugador esta lejos, deambula en vez de
+                        // atravesar todo el mapa en linea recta. Al acercarse, retoma la persecucion.
+                        if (dist > wanderDistancia)
+                        {
+                            _wanderTimer -= Time.deltaTime;
+                            Vector3 w = _wanderObjetivo - transform.position; w.y = 0f;
+                            if (_wanderTimer <= 0f || w.sqrMagnitude < 0.5f)
+                            {
+                                float a = UnityEngine.Random.Range(0f, Mathf.PI * 2f);
+                                float r = UnityEngine.Random.Range(2f, wanderRadio);
+                                _wanderObjetivo = transform.position + new Vector3(Mathf.Cos(a) * r, 0f, Mathf.Sin(a) * r);
+                                _wanderTimer = UnityEngine.Random.Range(2f, 4f);
+                                w = _wanderObjetivo - transform.position; w.y = 0f;
+                            }
+                            if (w.sqrMagnitude > 0.01f) Mover(w.normalized, speed * 0.45f);
+                            Separar(Time.deltaTime);
+                            return;
+                        }
                         Mover(delta / Mathf.Max(dist, 0.001f), speed);
                         return;
                     }
@@ -997,7 +1020,7 @@ namespace SlugOut.World
         private void InvocarSifilo()
         {
             if (target == null) return;
-            var arena = Object.FindFirstObjectByType<SlugArenaGame>();
+            var arena = Object.FindAnyObjectByType<SlugArenaGame>();
             if (arena == null) return;
             arena.SpawnSifilo(transform.position + transform.forward * 2f, target);
             invocaciones++;

@@ -14,7 +14,6 @@ namespace SlugOut.World
         [SerializeField] private bool terceraPersona = false;
         [SerializeField] private bool seguirOrientacion = true;
         [SerializeField] private float alturaFoco = 1.2f;
-        [SerializeField] private float distanciaMinima = 1.2f;
         [SerializeField] private LayerMask paredes = ~0;
 
         [Header("Temblor (trauma de GameFeel)")]
@@ -61,7 +60,7 @@ namespace SlugOut.World
         {
             if (target == null)
             {
-                PlayerController pc = Object.FindFirstObjectByType<PlayerController>();
+                PlayerController pc = Object.FindAnyObjectByType<PlayerController>();
                 if (pc != null) target = pc.transform;
             }
             // la arena se veia desde muy arriba: las babosas quedaban a ~60 px y no se leia
@@ -139,8 +138,8 @@ namespace SlugOut.World
                     if (Physics.SphereCast(origenRayo, 0.22f, dir / dist, out RaycastHit hit,
                             dist, paredes, QueryTriggerInteraction.Ignore))
                     {
-                        // Sin el piso de distanciaMinima: si el pilar esta mas cerca, la camara
-                        // se arrima al jugador en vez de quedar dentro de la piedra.
+                        // Piso de 0.35: si el pilar esta mas cerca, la camara se arrima al
+                        // jugador en vez de quedar dentro de la piedra.
                         distObjetivo = Mathf.Clamp(hit.distance - 0.2f, 0.35f, dist);
                     }
                     if (_distanciaActual < 0f) _distanciaActual = dist;

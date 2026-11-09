@@ -10,7 +10,7 @@ namespace SlugOut.EditorTools
     public static class CapturaMundo
     {
         private const string ESCENA = "Assets/Scenes/ArtePixar.unity";
-        private const string SALIDA = "C:/Users/USUARIO/SLUG OUT/Capturas/mundo_abierto.png";
+        private const string SALIDA = "C:/Users/USUARIO/SLUG OUT/Capturas/mundo_cerca2.png";
 
         public static void Render()
         {
@@ -36,8 +36,8 @@ namespace SlugOut.EditorTools
             var cam = camGO.AddComponent<Camera>();
             cam.clearFlags = CameraClearFlags.SolidColor;
             cam.backgroundColor = new Color(0.05f, 0.05f, 0.1f);
-            camGO.transform.position = new Vector3(0f, 14f, -12f);
-            camGO.transform.LookAt(new Vector3(0f, 0f, 2f));
+            camGO.transform.position = new Vector3(0f, 6f, -13f);
+            camGO.transform.LookAt(new Vector3(0f, 1f, 0f));
             cam.fieldOfView = 55f;
 
             int w = 1280, h = 720;
@@ -67,14 +67,16 @@ namespace SlugOut.EditorTools
             go.transform.position = pos;
             var npc = go.AddComponent<SlugOut.World.NpcAmbulante>();
             npc.modeloPath = modeloPath;
-            // Forzar carga inmediata del modelo para la captura
-            var prefab = Resources.Load<GameObject>(modeloPath);
+            // Forzar carga inmediata del modelo para la captura (AssetDatabase en editor)
+            string ruta = "Assets/Resources/" + modeloPath + ".fbx";
+            var prefab = AssetDatabase.LoadAssetAtPath<GameObject>(ruta);
             if (prefab != null)
             {
                 var inst = Object.Instantiate(prefab, pos, Quaternion.identity, go.transform);
                 inst.transform.localPosition = Vector3.zero;
+                Debug.Log("[CapturaMundo] modelo cargado: " + modeloPath);
             }
-            else Debug.LogWarning("[CapturaMundo] No se cargo: " + modeloPath);
+            else Debug.LogWarning("[CapturaMundo] No se cargo: " + ruta);
         }
     }
 }

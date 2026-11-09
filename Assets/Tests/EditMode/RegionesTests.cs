@@ -329,7 +329,7 @@ namespace SlugOut.EditModeTests
             }
         }
 
-        /// El disparador del tunel cacheaba `FindFirstObjectByType<SlugActor>()`; con enemigos
+        /// El disparador del tunel cacheaba `FindAnyObjectByType<SlugActor>()`; con enemigos
         /// vivos eso devuelve un enemigo y el guard `!IsPlayer` dejaba la boca muerta para el resto
         /// de la partida (medido en Play: cache "Ascua (enemigo)" con el jugador sobre la boca).
         [Test] public void ElDisparadorEligeAlJugadorAunqueElEnemigoVayaPrimero()

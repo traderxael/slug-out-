@@ -513,7 +513,7 @@ namespace SlugOut.World
             if (fase >= 1) transformaciones++; else tirosCortos++;
             if (fase >= 2) megamorfosis++;
             // Jingle al transformar el tiro: velocimorph (>=100 MPH) o megamorph.
-            var fx = Object.FindFirstObjectByType<SlugFx>();
+            var fx = Object.FindAnyObjectByType<SlugFx>();
             if (fx != null) fx.Transformacion(fase);
 
             shotsFired++;

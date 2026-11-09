@@ -288,12 +288,12 @@ namespace SlugOut.World
 
             // Momento de captura: hitstop + camara lenta. Hitstop es de instancia (vive en el
             // componente GameFeel de la escena), AddTrauma es estatico.
-            var feel = Object.FindFirstObjectByType<GameFeel>();
+            var feel = Object.FindAnyObjectByType<GameFeel>();
             if (feel != null) feel.Hitstop(0.12f);
             GameFeel.AddTrauma(1.2f);
 
             // FX por elemento: chime y particulas del color.
-            var fx = Object.FindFirstObjectByType<SlugFx>();
+            var fx = Object.FindAnyObjectByType<SlugFx>();
             if (fx != null) fx.Capture(Data != null ? Data.elementColor : Color.cyan);
 
             Debug.Log("[SlugActor] " + name + " CAPTURADA");

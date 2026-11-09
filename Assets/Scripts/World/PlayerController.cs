@@ -17,6 +17,9 @@ namespace SlugOut.World
                  "deja de ser gratis: se cambia movilidad por dano y transformacion.")]
         [SerializeField] private float factorVelocidadCargando = 0.7f;
         [SerializeField] private float turnSpeed = 720f;
+        [Tooltip("Suavizado de aceleracion: 0=instantaneo, 12=fluido")]
+        [SerializeField] private float aceleracionMov = 12f;
+        private Vector3 _velSuavizada;
         [SerializeField] private bool logMovement = false;
         [SerializeField] private float logEvery = 0.5f;
         [Tooltip("Cuanto sobresale el pivot del personaje sobre el piso.")]
@@ -117,6 +120,10 @@ namespace SlugOut.World
             _lastPosition = transform.position;
             SombraContacto.Agregar(transform, 0.52f);
             if (logMovement) Debug.Log("[PlayerController] inicio en " + transform.position);
+            // El modelo del jugador lo carga SlugArenaGame.AttachShane (shane_pixar) o el
+            // Cuerpo_Shane ya presente en la escena. Montar PlayerModel ademas apilaba el
+            // rogue de Characters/Jugador encima del heroe: el jugador se veia doble.
+            if (GetComponent<PlayerModel>() != null) Destroy(GetComponent<PlayerModel>());
         }
 
         private Vector3 ReadInput()
@@ -136,14 +143,15 @@ namespace SlugOut.World
 
             if (raw.sqrMagnitude > 0.0001f)
             {
-                // Resolver el tirador antes de la velocidad: mantener el disparo ahora cuesta
-                // movilidad, asi cargar al maximo deja de ser una jugada sin contrapeso.
                 if (_shooter == null) _shooter = GetComponent<PlayerShooter>();
                 bool cargando = _shooter != null && _shooter.Cargando;
                 float vel = VelocidadDeMarcha(speed, pasoCuidadoSpeed, PasoCuidado, cargando,
                     factorVelocidadCargando);
                 Velocidad = vel;
-                Mover(raw * vel * Time.deltaTime);
+                Vector3 objetivo = raw * vel;
+                float k = aceleracionMov <= 0.01f ? 1f : Mathf.Clamp01(aceleracionMov * Time.deltaTime);
+                _velSuavizada = Vector3.Lerp(_velSuavizada, objetivo, k);
+                Mover(_velSuavizada * Time.deltaTime);
                 // Mientras el tirador apunta (cargando ESPACIO con objetivo), la orientacion la
                 // manda el enemigo y no el movimiento: eso permite strafear de costado sin
                 // perder el apuntado.
@@ -153,7 +161,7 @@ namespace SlugOut.World
                     transform.rotation = Quaternion.RotateTowards(transform.rotation, target, turnSpeed * Time.deltaTime);
                 }
             }
-            else Velocidad = 0f;
+            else { Velocidad = 0f; _velSuavizada = Vector3.Lerp(_velSuavizada, Vector3.zero, Mathf.Clamp01(14f * Time.deltaTime)); if (_velSuavizada.sqrMagnitude > 0.001f) Mover(_velSuavizada * Time.deltaTime); }
 
             ApoyarEnPiso();
 

@@ -12,8 +12,7 @@ namespace SlugOut.World
         [SerializeField] private float volumen = 0.3f;
         [SerializeField] private bool arrancar = true;
 
-        [Header("Estado (solo lectura)")]
-        [SerializeField] private bool sonando = false;
+        public bool Sonando => _src != null && _src.isPlaying;
 
         private AudioSource _src;
         private static AudioClip _loop;
@@ -38,7 +37,6 @@ namespace SlugOut.World
             {
                 _src.clip = _loop;
                 _src.Play();
-                sonando = true;
             }
         }
 

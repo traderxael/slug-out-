@@ -1,0 +1,183 @@
+{
+ "piezas": {
+  "roca": {
+   "vertices": 42,
+   "triangulos": 80,
+   "caja": [
+    1.039,
+    0.931,
+    0.681
+   ],
+   "alto": 0.681,
+   "ancho": 1.039,
+   "archivos": {
+    "blend": "C:\\Users\\USUARIO\\AppData\\Local\\hermes\\cache\\scratch\\slugout\\cueva-out\\roca.blend",
+    "obj": "C:\\Users\\USUARIO\\AppData\\Local\\hermes\\cache\\scratch\\slugout\\cueva-out\\roca.obj",
+    "fbx": "C:\\Users\\USUARIO\\AppData\\Local\\hermes\\cache\\scratch\\slugout\\cueva-out\\roca.fbx"
+   }
+  },
+  "cristal": {
+   "vertices": 42,
+   "triangulos": 72,
+   "caja": [
+    0.475,
+    0.378,
+    1.0
+   ],
+   "alto": 1.0,
+   "ancho": 0.475,
+   "archivos": {
+    "blend": "C:\\Users\\USUARIO\\AppData\\Local\\hermes\\cache\\scratch\\slugout\\cueva-out\\cristal.blend",
+    "obj": "C:\\Users\\USUARIO\\AppData\\Local\\hermes\\cache\\scratch\\slugout\\cueva-out\\cristal.obj",
+    "fbx": "C:\\Users\\USUARIO\\AppData\\Local\\hermes\\cache\\scratch\\slugout\\cueva-out\\cristal.fbx"
+   }
+  },
+  "estalactita": {
+   "vertices": 47,
+   "triangulos": 90,
+   "caja": [
+    1.94,
+    1.97,
+    1.0
+   ],
+   "alto": 1.0,
+   "ancho": 1.97,
+   "archivos": {
+    "blend": "C:\\Users\\USUARIO\\AppData\\Local\\hermes\\cache\\scratch\\slugout\\cueva-out\\estalactita.blend",
+    "obj": "C:\\Users\\USUARIO\\AppData\\Local\\hermes\\cache\\scratch\\slugout\\cueva-out\\estalactita.obj",
+    "fbx": "C:\\Users\\USUARIO\\AppData\\Local\\hermes\\cache\\scratch\\slugout\\cueva-out\\estalactita.fbx"
+   }
+  },
+  "estalagmita": {
+   "vertices": 47,
+   "triangulos": 90,
+   "caja": [
+    1.94,
+    1.97,
+    1.0
+   ],
+   "alto": 1.0,
+   "ancho": 1.97,
+   "archivos": {
+    "blend": "C:\\Users\\USUARIO\\AppData\\Local\\hermes\\cache\\scratch\\slugout\\cueva-out\\estalagmita.blend",
+    "obj": "C:\\Users\\USUARIO\\AppData\\Local\\hermes\\cache\\scratch\\slugout\\cueva-out\\estalagmita.obj",
+    "fbx": "C:\\Users\\USUARIO\\AppData\\Local\\hermes\\cache\\scratch\\slugout\\cueva-out\\estalagmita.fbx"
+   }
+  },
+  "columna": {
+   "vertices": 72,
+   "triangulos": 140,
+   "caja": [
+    2.0,
+    1.902,
+    1.0
+   ],
+   "alto": 1.0,
+   "ancho": 2.0,
+   "archivos": {
+    "blend": "C:\\Users\\USUARIO\\AppData\\Local\\hermes\\cache\\scratch\\slugout\\cueva-out\\columna.blend",
+    "obj": "C:\\Users\\USUARIO\\AppData\\Local\\hermes\\cache\\scratch\\slugout\\cueva-out\\columna.obj",
+    "fbx": "C:\\Users\\USUARIO\\AppData\\Local\\hermes\\cache\\scratch\\slugout\\cueva-out\\columna.fbx"
+   }
+  },
+  "esquirla": {
+   "vertices": 7,
+   "triangulos": 10,
+   "caja": [
+    1.058,
+    0.935,
+    1.0
+   ],
+   "alto": 1.0,
+   "ancho": 1.058,
+   "archivos": {
+    "blend": "C:\\Users\\USUARIO\\AppData\\Local\\hermes\\cache\\scratch\\slugout\\cueva-out\\esquirla.blend",
+    "obj": "C:\\Users\\USUARIO\\AppData\\Local\\hermes\\cache\\scratch\\slugout\\cueva-out\\esquirla.obj",
+    "fbx": "C:\\Users\\USUARIO\\AppData\\Local\\hermes\\cache\\scratch\\slugout\\cueva-out\\esquirla.fbx"
+   }
+  },
+  "hongo_tallo": {
+   "vertices": 52,
+   "triangulos": 100,
+   "caja": [
+    2.0,
+    1.902,
+    1.0
+   ],
+   "alto": 1.0,
+   "ancho": 2.0,
+   "archivos": {
+    "blend": "C:\\Users\\USUARIO\\AppData\\Local\\hermes\\cache\\scratch\\slugout\\cueva-out\\hongo_tallo.blend",
+    "obj": "C:\\Users\\USUARIO\\AppData\\Local\\hermes\\cache\\scratch\\slugout\\cueva-out\\hongo_tallo.obj",
+    "fbx": "C:\\Users\\USUARIO\\AppData\\Local\\hermes\\cache\\scratch\\slugout\\cueva-out\\hongo_tallo.fbx"
+   }
+  },
+  "hongo_cap": {
+   "vertices": 71,
+   "triangulos": 126,
+   "caja": [
+    2.0,
+    1.95,
+    1.0
+   ],
+   "alto": 1.0,
+   "ancho": 2.0,
+   "archivos": {
+    "blend": "C:\\Users\\USUARIO\\AppData\\Local\\hermes\\cache\\scratch\\slugout\\cueva-out\\hongo_cap.blend",
+    "obj": "C:\\Users\\USUARIO\\AppData\\Local\\hermes\\cache\\scratch\\slugout\\cueva-out\\hongo_cap.obj",
+    "fbx": "C:\\Users\\USUARIO\\AppData\\Local\\hermes\\cache\\scratch\\slugout\\cueva-out\\hongo_cap.fbx"
+   }
+  },
+  "hongo_laminas": {
+   "vertices": 84,
+   "triangulos": 84,
+   "caja": [
+    1.72,
+    1.677,
+    0.23
+   ],
+   "alto": 0.23,
+   "ancho": 1.72,
+   "archivos": {
+    "blend": "C:\\Users\\USUARIO\\AppData\\Local\\hermes\\cache\\scratch\\slugout\\cueva-out\\hongo_laminas.blend",
+    "obj": "C:\\Users\\USUARIO\\AppData\\Local\\hermes\\cache\\scratch\\slugout\\cueva-out\\hongo_laminas.obj",
+    "fbx": "C:\\Users\\USUARIO\\AppData\\Local\\hermes\\cache\\scratch\\slugout\\cueva-out\\hongo_laminas.fbx"
+   }
+  },
+  "losa": {
+   "vertices": 16,
+   "triangulos": 16,
+   "caja": [
+    1.072,
+    0.933,
+    0.12
+   ],
+   "alto": 0.12,
+   "ancho": 1.072,
+   "archivos": {
+    "blend": "C:\\Users\\USUARIO\\AppData\\Local\\hermes\\cache\\scratch\\slugout\\cueva-out\\losa.blend",
+    "obj": "C:\\Users\\USUARIO\\AppData\\Local\\hermes\\cache\\scratch\\slugout\\cueva-out\\losa.obj",
+    "fbx": "C:\\Users\\USUARIO\\AppData\\Local\\hermes\\cache\\scratch\\slugout\\cueva-out\\losa.fbx"
+   }
+  },
+  "techo": {
+   "vertices": 64,
+   "triangulos": 96,
+   "caja": [
+    2.0,
+    2.035,
+    0.16
+   ],
+   "alto": 0.16,
+   "ancho": 2.035,
+   "archivos": {
+    "blend": "C:\\Users\\USUARIO\\AppData\\Local\\hermes\\cache\\scratch\\slugout\\cueva-out\\techo.blend",
+    "obj": "C:\\Users\\USUARIO\\AppData\\Local\\hermes\\cache\\scratch\\slugout\\cueva-out\\techo.obj",
+    "fbx": "C:\\Users\\USUARIO\\AppData\\Local\\hermes\\cache\\scratch\\slugout\\cueva-out\\techo.fbx"
+   }
+  }
+ },
+ "total_triangulos": 904,
+ "total_vertices": 544,
+ "nota": "Mallas con UV. Unity las carga desde Resources/Cueva y las hornea con LoteMalla: el batching y los draw calls no cambian."
+}

@@ -174,7 +174,7 @@ namespace SlugOut.World
         {
             if (jugador == null)
             {
-                PlayerController pc = Object.FindFirstObjectByType<PlayerController>();
+                PlayerController pc = Object.FindAnyObjectByType<PlayerController>();
                 if (pc != null) jugador = pc.transform;
             }
             if (juego == null) juego = GetComponent<SlugArenaGame>();
@@ -765,7 +765,7 @@ namespace SlugOut.World
 
         private void CacheMapa()
         {
-            if (_region == null) _region = Object.FindFirstObjectByType<RegionCuevaSeca>();
+            if (_region == null) _region = Object.FindAnyObjectByType<RegionCuevaSeca>();
             if (_region == null || _region.Root == null) return;
             // Al cruzar un tunel la region se reconstruye: los Transform viejos quedan destruidos
             // y hay que volver a tomar los nuevos. `Version` sube justo en ese momento.

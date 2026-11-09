@@ -2,3 +2,34 @@
 _chk.js
 __pycache__/
 *.pyc
+
+# Unity: recuperacion y temporales (no son contenido del proyecto)
+/[Aa]ssets/[Aa]ssetStore*
+/[Aa]ssets/_Recovery/
+/[Ll]ibrary/
+/[Tt]emp/
+/[Oo]bj/
+/[Bb]uild/
+/[Bb]uilds/
+/[Ll]ogs/
+/[Uu]serSettings/
+
+# Carpetas de trabajo locales: respaldos, capturas, builds y herramientas (~1.6 GB)
+/Backups/
+/Capturas/
+/Screenshots/
+/_fuera-de-unity/
+/TestResults/
+/Tools/
+
+*.csproj
+*.unityproj
+*.sln
+*.tmp
+*.user
+*.userprefs
+*.pidb
+*.booproj
+*.svd
+*.opendb
+

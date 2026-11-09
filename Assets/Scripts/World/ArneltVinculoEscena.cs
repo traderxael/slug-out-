@@ -65,7 +65,7 @@ namespace SlugOut.World
                 Application.runInBackground = true;
                 yield return new WaitForSeconds(1.5f);
 
-                BabosaSalvaje slug = Object.FindFirstObjectByType<BabosaSalvaje>();
+                BabosaSalvaje slug = Object.FindAnyObjectByType<BabosaSalvaje>();
                 if (slug == null)
                 {
                     Report(sb.AppendLine("SETUP FAIL: sin BabosaSalvaje"));

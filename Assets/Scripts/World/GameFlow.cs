@@ -183,7 +183,7 @@ namespace SlugOut.World
         /// la region correcta no toca nada; sin RegionCuevaSeca (tests con arena aislada) sale.
         private static void PrepararRegion(int destino)
         {
-            RegionCuevaSeca region = Object.FindFirstObjectByType<RegionCuevaSeca>();
+            RegionCuevaSeca region = Object.FindAnyObjectByType<RegionCuevaSeca>();
             if (region == null) return;
             if (RegionCuevaSeca.Actual == destino && region.Root != null) return;
             region.Reconstruir(destino, out _, -1);
