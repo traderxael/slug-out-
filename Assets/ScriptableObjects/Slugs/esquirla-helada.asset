@@ -1,0 +1,34 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 169a931c15d0e284188fe761457fcd79, type: 3}
+  m_Name: esquirla-helada
+  m_EditorClassIdentifier: Assembly-CSharp::SlugOut.Slugs.SlugData
+  slugId: esquirla-helada
+  slugName: Esquirla Helada
+  description: Esquirla Helada tipo Ice que congela el aire y frena al oponente en seco.
+  element: 5
+  habitat: Estalactitas y charcos congelados.
+  conducta: Duerme sobre el hielo; el calor la despierta de mal humor.
+  uso: Congela y baja la carga del blaster rival.
+  limitacion: El fuego la derrite y le recorta el alcance.
+  baseDamage: 31
+  launchSpeedMph: 47
+  accelerationRate: 90
+  requiredEnergy: 100
+  clashPower: 53
+  abilityType: 3
+  abilityMagnitude: 1.8
+  effectDuration: 2
+  protoformSprite: {fileID: 0}
+  velocimorphSprite: {fileID: 0}
+  elementColor: {r: 0.6, g: 0.9, b: 1, a: 1}
+  velocimorphAuraColor: {r: 0.86, g: 0.94, b: 0.8, a: 1}

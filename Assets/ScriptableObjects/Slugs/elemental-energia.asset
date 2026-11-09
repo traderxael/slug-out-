@@ -1,0 +1,34 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 169a931c15d0e284188fe761457fcd79, type: 3}
+  m_Name: elemental-energia
+  m_EditorClassIdentifier: Assembly-CSharp::SlugOut.Slugs.SlugData
+  slugId: elemental-energia
+  slugName: Elemental de Energia
+  description: 'Elemental de Energia tipo Energy de energia pura: su impacto atraviesa cualquier guardia.'
+  element: 7
+  habitat: Camaras de cristal que vibran.
+  conducta: Flota y pulsa; se aleja del metal.
+  uso: Empuja con fuerza sin quemar.
+  limitacion: 'Es inestable: falla si el tiro sale muy corto.'
+  baseDamage: 36
+  launchSpeedMph: 55
+  accelerationRate: 100
+  requiredEnergy: 105
+  clashPower: 58
+  abilityType: 0
+  abilityMagnitude: 22
+  effectDuration: 3
+  protoformSprite: {fileID: 0}
+  velocimorphSprite: {fileID: 0}
+  elementColor: {r: 0.85, g: 0.3, b: 1, a: 1}
+  velocimorphAuraColor: {r: 1, g: 0.58000004, b: 0.8, a: 1}

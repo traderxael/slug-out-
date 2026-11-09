@@ -1,0 +1,8 @@
+﻿<Solution>
+  <Project Path="SlugOut.csproj" />
+  <Project Path="SlugOut.EditModeTests.csproj" />
+  <Project Path="SlugOut.PlayModeTests.csproj" />
+  <Project Path="SlugOut.Editor.csproj" />
+  <Project Path="Assembly-CSharp-Editor.csproj" />
+  <Project Path="Assembly-CSharp.csproj" />
+</Solution>
