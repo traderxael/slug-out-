@@ -6,6 +6,7 @@ __pycache__/
 # Unity: recuperacion y temporales (no son contenido del proyecto)
 /[Aa]ssets/[Aa]ssetStore*
 /[Aa]ssets/_Recovery/
+/[Aa]ssets/_Recovery.meta
 /[Ll]ibrary/
 /[Tt]emp/
 /[Oo]bj/
